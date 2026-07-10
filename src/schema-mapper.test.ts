@@ -50,3 +50,46 @@ test('hoists named interfaces into components and references them', () => {
     required: ['id'],
   });
 });
+
+test('maps Date-typed properties to string/date-time without hoisting Date methods', () => {
+  const result = mapType(typeOf('{ createdAt: Date }'));
+
+  expect(result.schema).toEqual({
+    type: 'object',
+    properties: { createdAt: { type: 'string', format: 'date-time' } },
+    required: ['createdAt'],
+  });
+  expect(result.components).toEqual({});
+});
+
+test('skips function-typed properties instead of hoisting their signatures', () => {
+  const result = mapType(typeOf('{ onClick: () => void }'));
+
+  expect(result.schema).toEqual({
+    type: 'object',
+    properties: { onClick: {} },
+    required: ['onClick'],
+  });
+  expect(result.components).toEqual({});
+});
+
+test('never emits invalid component names or method components for builtin types', () => {
+  const result = mapType(typeOf('{ createdAt: Date; onClick: () => void }'));
+
+  const componentNames = Object.keys(result.components);
+  for (const name of componentNames) {
+    expect(name).toMatch(/^[A-Za-z0-9_.-]+$/);
+  }
+  expect(componentNames).not.toContain('toString');
+  expect(componentNames).not.toContain('valueOf');
+});
+
+test('collapses an optional boolean property to a boolean schema', () => {
+  const result = mapType(typeOf('{ b?: boolean }'));
+
+  expect(result.schema).toEqual({
+    type: 'object',
+    properties: { b: { type: 'boolean' } },
+  });
+  expect(result.schema.required).toBeUndefined();
+});

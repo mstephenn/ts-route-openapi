@@ -32,12 +32,29 @@ function toSchema(type: Type, components: Components, seen: Set<string>): Schema
     }
     const defined = parts.filter((p) => !p.isUndefined() && !p.isNull());
     if (defined.length === 1) return toSchema(defined[0], components, seen);
+    // `boolean` collapses to the union `true | false` (plus `undefined` when
+    // optional); recombine those literal members into a single boolean schema.
+    if (defined.length > 0 && defined.every((p) => p.isBooleanLiteral() || p.isBoolean())) {
+      return { type: 'boolean' };
+    }
   }
 
   if (type.isObject()) {
-    const name = type.getSymbol()?.getName();
+    const symbol = type.getSymbol();
+    const name = symbol?.getName();
+    const declarations = symbol?.getDeclarations() ?? [];
+    const isFromProjectSource = declarations.length > 0 && declarations.every((d) => !d.getSourceFile().isInNodeModules());
+
+    if (name === 'Date' && !isFromProjectSource) {
+      return { type: 'string', format: 'date-time' };
+    }
+
+    // Callable types (functions, arrow types, etc.) have no meaningful OpenAPI
+    // representation; skip them rather than hoisting their method signatures.
+    if (type.getCallSignatures().length > 0) return {};
+
     const isNamed = !!name && name !== '__type' && name !== '__object';
-    if (isNamed) {
+    if (isNamed && isFromProjectSource) {
       if (!seen.has(name)) {
         seen.add(name);
         components[name] = objectSchema(type, components, seen);
