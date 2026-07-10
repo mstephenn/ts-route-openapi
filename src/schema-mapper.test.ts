@@ -93,3 +93,20 @@ test('collapses an optional boolean property to a boolean schema', () => {
   });
   expect(result.schema.required).toBeUndefined();
 });
+
+test('does not blow the stack on recursive inlined types (e.g. type aliases, lib types)', () => {
+  const project = new Project({ useInMemoryFileSystem: true });
+  const sf = project.createSourceFile(
+    't.ts',
+    `type LinkedNode = { value: string; next: LinkedNode }; declare const value: LinkedNode;`,
+  );
+  const type = sf.getVariableDeclarationOrThrow('value').getType();
+
+  const result = mapType(type);
+
+  expect(result.schema).toEqual({
+    type: 'object',
+    properties: { value: { type: 'string' }, next: {} },
+    required: ['value', 'next'],
+  });
+});
