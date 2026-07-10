@@ -1,0 +1,21 @@
+{
+  "name": "ts-route-openapi",
+  "version": "0.0.0",
+  "type": "module",
+  "bin": { "ts-route-openapi": "dist/cli.js" },
+  "scripts": {
+    "build": "tsc -p tsconfig.json",
+    "test": "vitest run",
+    "lint": "tsc -p tsconfig.json --noEmit"
+  },
+  "dependencies": {
+    "cac": "^6.7.14",
+    "ts-morph": "^24.0.0",
+    "yaml": "^2.5.0"
+  },
+  "devDependencies": {
+    "@types/node": "^22.0.0",
+    "typescript": "^5.6.0",
+    "vitest": "^2.1.0"
+  }
+}
