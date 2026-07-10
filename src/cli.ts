@@ -13,13 +13,25 @@ cli
   .option('--title <title>', 'API title', { default: 'API' })
   .option('--api-version <version>', 'API version', { default: '1.0.0' })
   .action((tsconfig: string | undefined, options: { out: string; format: string; title: string; apiVersion: string }) => {
-    const doc = generate(tsconfig ?? 'tsconfig.json', {
-      title: options.title,
-      version: options.apiVersion,
-    });
-    const serialized = options.format === 'yaml' ? stringify(doc) : `${JSON.stringify(doc, null, 2)}\n`;
-    writeFileSync(options.out, serialized);
-    console.log(`Wrote ${options.out}`);
+    if (options.format !== 'json' && options.format !== 'yaml') {
+      console.error(`Invalid format "${options.format}": expected "json" or "yaml"`);
+      process.exitCode = 1;
+      return;
+    }
+
+    try {
+      const doc = generate(tsconfig ?? 'tsconfig.json', {
+        title: options.title,
+        version: options.apiVersion,
+      });
+      const serialized = options.format === 'yaml' ? stringify(doc) : `${JSON.stringify(doc, null, 2)}\n`;
+      writeFileSync(options.out, serialized);
+      console.log(`Wrote ${options.out}`);
+    } catch (error) {
+      const message = error instanceof Error ? error.message : String(error);
+      console.error(`Failed to generate OpenAPI spec: ${message}`);
+      process.exitCode = 1;
+    }
   });
 
 cli.help();
