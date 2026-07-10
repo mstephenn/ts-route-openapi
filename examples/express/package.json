@@ -1,0 +1,20 @@
+{
+  "name": "example-express",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "tsx src/app.ts",
+    "openapi": "ts-route-openapi tsconfig.json -o openapi.yaml -f yaml --title \"Orders API (Express)\" --api-version 1.0.0",
+    "lint": "tsc -p tsconfig.json --noEmit"
+  },
+  "dependencies": {
+    "express": "^5.1.0"
+  },
+  "devDependencies": {
+    "@types/express": "^5.0.0",
+    "@types/node": "^26.1.1",
+    "ts-route-openapi": "file:../..",
+    "tsx": "^4.23.0",
+    "typescript": "^7.0.2"
+  }
+}

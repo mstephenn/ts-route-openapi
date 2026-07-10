@@ -1,0 +1,13 @@
+{
+  "name": "example-generic",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "openapi": "ts-route-openapi tsconfig.json -o openapi.yaml -f yaml --title \"Orders API (Generic)\" --api-version 1.0.0",
+    "lint": "tsc -p tsconfig.json --noEmit"
+  },
+  "devDependencies": {
+    "ts-route-openapi": "file:../..",
+    "typescript": "^7.0.2"
+  }
+}

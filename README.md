@@ -128,7 +128,19 @@ unwrapping `Promise<T>` to `T` when present.
 - Named `interface`/`class` types declared in your project are hoisted into
   `components.schemas` and referenced via `$ref`.
 
+## Examples
+
+Runnable **Express**, **Fastify**, and framework-agnostic examples — each with
+its generated `openapi.yaml` committed — live in [`examples/`](./examples).
+They demonstrate the typed-controller + adapter pattern the tool is designed
+for.
+
 ## Limitations (MVP scope)
+
+- **Idiomatic `(req, res)` handlers are not supported**: handlers must be
+  plain typed methods (`getById(id: string): Order`). Framework
+  request/response objects carry no extractable route types — register typed
+  controllers through a thin adapter instead (see [`examples/`](./examples)).
 
 - **Single response**: only a `200` response is emitted; no error responses,
   no auth, no other status codes.
