@@ -1,10 +1,37 @@
 {
   "name": "ts-route-openapi",
-  "version": "0.0.0",
-  "description": "Generate OpenAPI 3.0.3 specs from TypeScript route→controller code via static analysis (ts-morph).",
+  "version": "0.1.0",
+  "description": "Generate OpenAPI 3.0.3 specs from TypeScript route→controller code via static analysis (ts-morph) — no decorators or JSDoc required.",
+  "license": "MIT",
+  "author": "mstephenn",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/mstephenn/ts-route-openapi.git"
+  },
+  "homepage": "https://github.com/mstephenn/ts-route-openapi#readme",
+  "bugs": "https://github.com/mstephenn/ts-route-openapi/issues",
+  "keywords": [
+    "openapi",
+    "swagger",
+    "typescript",
+    "api-documentation",
+    "ts-morph",
+    "static-analysis",
+    "code-generation",
+    "openapi3",
+    "cli"
+  ],
   "type": "module",
   "bin": { "ts-route-openapi": "dist/cli.js" },
-  "files": ["dist"],
+  "main": "./dist/generate.js",
+  "exports": {
+    ".": "./dist/generate.js"
+  },
+  "types": "./dist/generate.d.ts",
+  "files": ["dist", "LICENSE", "README.md"],
+  "engines": {
+    "node": ">=20"
+  },
   "scripts": {
     "build": "tsc -p tsconfig.build.json",
     "test": "vitest run",
