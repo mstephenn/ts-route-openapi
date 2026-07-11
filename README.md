@@ -145,7 +145,10 @@ unwrapping `Promise<T>` to `T` when present.
 - Primitives (`string`, `number`, `boolean`), arrays, and nested objects map
   to their OpenAPI equivalents; optional properties (`?`) are omitted from
   `required`.
-- String-literal unions (`'a' | 'b'`) map to `enum`.
+- String-literal unions (`'a' | 'b'`) map to `enum`; numeric-literal unions
+  to a number `enum`; other unions map to `oneOf` (discriminated object
+  unions become `oneOf` over `$ref`s). `null`/`undefined` members are
+  stripped.
 - `Date` maps to `{ type: string, format: date-time }`.
 - Named `interface`/`class`/`type` alias declarations from your project are
   hoisted into `components.schemas` and referenced via `$ref` (recursive
@@ -170,11 +173,6 @@ install, run the CLI, get the spec.
 - **Component name collisions are last-write-wins**: if two distinct types in
   the project share a name, whichever is hoisted last silently overwrites the
   earlier component in `components.schemas`. There is no collision detection.
-- **Multi-type unions are unsupported**: only string-literal unions (mapped
-  to an `enum`) and "optional" unions (`T | undefined`/`null`, including the
-  `boolean` special case) are handled. General unions of multiple distinct
-  types (e.g. `string | number`) are not mapped to `oneOf` and will not
-  produce a meaningful schema.
 - **Callable types** (functions, methods) map to an empty schema (`{}`)
   rather than being described.
 
