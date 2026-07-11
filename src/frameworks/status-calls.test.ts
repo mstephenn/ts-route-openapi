@@ -131,17 +131,3 @@ test('a shadowed param in a nested closure is not misattributed for either expre
   expect(extractTypes(expressRoute).responses?.map((r) => r.status)).toEqual([200]);
   expect(extractTypes(fastifyRoute).responses).toBeUndefined();
 });
-
-test('express: a shadowed res in a nested closure is not misattributed', () => {
-  const [route] = routesFrom(`
-    ${EXPRESS_DECLS}
-    declare const app: any;
-    app.get('/x', (req: Request, res: Response<{ ok: boolean }>) => {
-      [1].forEach((res: any) => res.status(500).json({ boom: true }));
-      res.json({ ok: true });
-    });
-  `);
-  const types = extractTypes(route);
-
-  expect(types.responses?.map((r) => r.status)).toEqual([200]);
-});

@@ -44,6 +44,9 @@ function paramMethodCalls(handler: RouteHandler, methodNames: Set<string>): Para
   return calls;
 }
 
+const EXPRESS_RESPONSE_METHODS = new Set(['json', 'send', 'end']);
+const FASTIFY_STATUS_METHODS = new Set(['code', 'status']);
+
 /**
  * Scan an Express-style handler body for response chains on `res`:
  * `res.status(N).json(x)` / `res.status(N).send(x)` / `res.status(N).end()`
@@ -57,7 +60,7 @@ export function expressStatusResponses(
 ): ResponseType[] {
   const found = new Map<number, Type | undefined>();
 
-  for (const { node, method, receiver } of paramMethodCalls(handler, new Set(['json', 'send', 'end']))) {
+  for (const { node, method, receiver } of paramMethodCalls(handler, EXPRESS_RESPONSE_METHODS)) {
     let status = 200;
     if (Node.isCallExpression(receiver)) {
       // res.status(N).json(...)
@@ -96,7 +99,7 @@ export function fastifyStatusResponses(
   const codes = new Set<number>();
 
   if (replyParam) {
-    for (const { node, receiver } of paramMethodCalls(handler, new Set(['code', 'status']))) {
+    for (const { node, receiver } of paramMethodCalls(handler, FASTIFY_STATUS_METHODS)) {
       if (!refersToParam(receiver, replyParam)) continue;
       const resolved = literalStatus(node.getArguments()[0]);
       if (resolved !== undefined) codes.add(resolved);
