@@ -1,4 +1,4 @@
-import { Node, type ParameterDeclaration, type Type } from 'ts-morph';
+import { Node, type CallExpression, type ParameterDeclaration, type Type } from 'ts-morph';
 import type { ResponseType, RouteHandler } from '../types.js';
 
 /**
@@ -17,6 +17,33 @@ function refersToParam(receiver: Node, param: ParameterDeclaration): boolean {
   return receiver.getSymbol()?.getDeclarations()[0] === param;
 }
 
+interface ParamMethodCall {
+  node: CallExpression;
+  method: string;
+  receiver: Node;
+}
+
+/**
+ * Walk a handler body for call expressions shaped `<receiver>.<method>(...)`
+ * where `method` is one of `methodNames` — the traversal both Express's and
+ * Fastify's response-status scanning share before diverging on how they
+ * interpret the receiver/status.
+ */
+function paramMethodCalls(handler: RouteHandler, methodNames: Set<string>): ParamMethodCall[] {
+  const calls: ParamMethodCall[] = [];
+
+  handler.forEachDescendant((node) => {
+    if (!Node.isCallExpression(node)) return;
+    const callee = node.getExpression();
+    if (!Node.isPropertyAccessExpression(callee)) return;
+    const method = callee.getName();
+    if (!methodNames.has(method)) return;
+    calls.push({ node, method, receiver: callee.getExpression() });
+  });
+
+  return calls;
+}
+
 /**
  * Scan an Express-style handler body for response chains on `res`:
  * `res.status(N).json(x)` / `res.status(N).send(x)` / `res.status(N).end()`
@@ -30,30 +57,23 @@ export function expressStatusResponses(
 ): ResponseType[] {
   const found = new Map<number, Type | undefined>();
 
-  handler.forEachDescendant((node) => {
-    if (!Node.isCallExpression(node)) return;
-    const callee = node.getExpression();
-    if (!Node.isPropertyAccessExpression(callee)) return;
-    const method = callee.getName();
-    if (method !== 'json' && method !== 'send' && method !== 'end') return;
-
-    const receiver = callee.getExpression();
+  for (const { node, method, receiver } of paramMethodCalls(handler, new Set(['json', 'send', 'end']))) {
     let status = 200;
     if (Node.isCallExpression(receiver)) {
       // res.status(N).json(...)
       const inner = receiver.getExpression();
-      if (!Node.isPropertyAccessExpression(inner) || inner.getName() !== 'status') return;
-      if (!refersToParam(inner.getExpression(), resParam)) return;
+      if (!Node.isPropertyAccessExpression(inner) || inner.getName() !== 'status') continue;
+      if (!refersToParam(inner.getExpression(), resParam)) continue;
       const resolved = literalStatus(receiver.getArguments()[0]);
-      if (resolved === undefined) return;
+      if (resolved === undefined) continue;
       status = resolved;
     } else if (!refersToParam(receiver, resParam)) {
-      return;
+      continue;
     }
 
-    if (found.has(status)) return;
+    if (found.has(status)) continue;
     found.set(status, method === 'end' ? undefined : node.getArguments()[0]?.getType());
-  });
+  }
 
   if (found.size === 0) return [];
   // Prefer the extractor's response type over an inferred payload for 200.
@@ -76,16 +96,11 @@ export function fastifyStatusResponses(
   const codes = new Set<number>();
 
   if (replyParam) {
-    handler.forEachDescendant((node) => {
-      if (!Node.isCallExpression(node)) return;
-      const callee = node.getExpression();
-      if (!Node.isPropertyAccessExpression(callee)) return;
-      const method = callee.getName();
-      if (method !== 'code' && method !== 'status') return;
-      if (!refersToParam(callee.getExpression(), replyParam)) return;
+    for (const { node, receiver } of paramMethodCalls(handler, new Set(['code', 'status']))) {
+      if (!refersToParam(receiver, replyParam)) continue;
       const resolved = literalStatus(node.getArguments()[0]);
       if (resolved !== undefined) codes.add(resolved);
-    });
+    }
   }
 
   if (codes.size === 0) return [];
