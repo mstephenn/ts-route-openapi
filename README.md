@@ -82,13 +82,18 @@ npx ts-route-openapi [tsconfig] -o openapi.json -f json --title "My API" --api-v
 | `-f, --format <fmt>`      | `json`          | Output format: `json` or `yaml`       |
 | `--title <title>`         | `API`           | Spec `info.title`                     |
 | `--api-version <version>` | `1.0.0`         | Spec `info.version`                   |
+| `--descriptions`          | off             | Include JSDoc summaries, descriptions, deprecation, and property descriptions |
 
 ## Programmatic usage
 
 ```ts
 import { generate } from 'ts-route-openapi';
 
-const doc = generate('path/to/tsconfig.json', { title: 'My API', version: '1.0.0' });
+const doc = generate(
+  'path/to/tsconfig.json',
+  { title: 'My API', version: '1.0.0' },
+  { descriptions: true },
+);
 ```
 
 ## How it works
@@ -157,6 +162,9 @@ unwrapping `Promise<T>` to `T` when present.
   (`object`, `string`, `number`, `boolean`, `array`, `enum`, `optional`,
   `nullable`, `literal`, and literal unions). Unsupported constructs degrade to
   `{}` with a stderr note.
+- When `--descriptions` is enabled, handler JSDoc adds operation
+  `summary`/`description`, `@deprecated` marks operations deprecated, and
+  property JSDoc becomes schema property `description`.
 
 ## Examples
 

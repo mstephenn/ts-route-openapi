@@ -50,6 +50,51 @@ test('builds an OpenAPI doc with templated path, params, body and response', () 
   expect(doc.components.schemas.CreateInput).toBeDefined();
 });
 
+test('adds handler JSDoc summary, description and deprecation when descriptions are enabled', () => {
+  const doc = buildOpenApi(
+    inputsFrom(`
+      /**
+       * List users.
+       * Returns users visible to the caller.
+       * @deprecated Use searchUsers.
+       */
+      function listUsers(): { id: string }[] {
+        return [];
+      }
+      declare const app: any;
+      app.get('/users', listUsers);
+    `),
+    undefined,
+    { descriptions: true },
+  ) as any;
+
+  expect(doc.paths['/users'].get.summary).toBe('List users.');
+  expect(doc.paths['/users'].get.description).toBe('Returns users visible to the caller.');
+  expect(doc.paths['/users'].get.deprecated).toBe(true);
+});
+
+test('leaves documented routes unchanged when descriptions are disabled', () => {
+  const doc = buildOpenApi(
+    inputsFrom(`
+      interface CreateInput {
+        /** User name. */
+        name: string
+      }
+      /** Create a user. */
+      function create(input: CreateInput): { ok: boolean } {
+        return { ok: true };
+      }
+      declare const app: any;
+      app.post('/users', create);
+    `),
+  ) as any;
+
+  const op = doc.paths['/users'].post;
+  expect(op.summary).toBeUndefined();
+  expect(op.deprecated).toBeUndefined();
+  expect(doc.components.schemas.CreateInput.properties.name).toEqual({ type: 'string' });
+});
+
 test('keeps same-named components distinct across route inputs', () => {
   const project = new Project({ useInMemoryFileSystem: true });
   project.createSourceFile('/public.ts', `export interface User { a: string }`);

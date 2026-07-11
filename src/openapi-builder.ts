@@ -1,5 +1,6 @@
 import { STATUS_CODES } from 'node:http';
 import { createSchemaMapper } from './schema-mapper.js';
+import { jsDocText } from './jsdoc.js';
 import type { ParamType, ResolvedRoute, RouteTypes } from './types.js';
 
 export interface RouteInput {
@@ -10,6 +11,10 @@ export interface RouteInput {
 export interface ApiInfo {
   title: string;
   version: string;
+}
+
+export interface BuildOptions {
+  descriptions?: boolean;
 }
 
 type Json = Record<string, unknown>;
@@ -25,12 +30,19 @@ function templatePath(path: string): string {
 export function buildOpenApi(
   inputs: RouteInput[],
   info: ApiInfo = { title: 'API', version: '1.0.0' },
+  options: BuildOptions = {},
 ): Json {
   const paths: Record<string, Json> = {};
-  const schemaMapper = createSchemaMapper();
+  const schemaMapper = createSchemaMapper({ descriptions: options.descriptions });
 
   for (const { route, types } of inputs) {
     const operation: Json = {};
+    if (options.descriptions) {
+      const docs = jsDocText(route.method);
+      if (docs.summary) operation.summary = docs.summary;
+      if (docs.description) operation.description = docs.description;
+      if (docs.deprecated) operation.deprecated = true;
+    }
     const parameters: Json[] = [];
 
     // A param without static type information documents as a string.

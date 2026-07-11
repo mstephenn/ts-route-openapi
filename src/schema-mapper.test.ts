@@ -51,6 +51,25 @@ test('hoists named interfaces into components and references them', () => {
   });
 });
 
+test('adds property descriptions from JSDoc when enabled', () => {
+  const project = new Project({ useInMemoryFileSystem: true });
+  const sf = project.createSourceFile(
+    't.ts',
+    `interface User {
+       /** User display name. */
+       name: string
+     }
+     declare const value: User;`,
+  );
+  const type = sf.getVariableDeclarationOrThrow('value').getType();
+
+  const result = mapType(type, { descriptions: true });
+
+  expect(result.components.User.properties).toEqual({
+    name: { type: 'string', description: 'User display name.' },
+  });
+});
+
 test('maps Date-typed properties to string/date-time without hoisting Date methods', () => {
   const result = mapType(typeOf('{ createdAt: Date }'));
 
