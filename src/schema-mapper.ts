@@ -1,4 +1,5 @@
 import { Node, type Type } from 'ts-morph';
+import { jsDocText } from './jsdoc.js';
 
 type Schema = Record<string, unknown>;
 type Components = Record<string, Schema>;
@@ -19,15 +20,19 @@ export interface SchemaMapper {
   mapType(type: Type): Schema;
 }
 
+export interface SchemaMapperOptions {
+  descriptions?: boolean;
+}
+
 /** Convert a TS type to an OpenAPI schema, hoisting named object types into components. */
-export function mapType(type: Type): SchemaResult {
-  const mapper = createSchemaMapper();
+export function mapType(type: Type, options: SchemaMapperOptions = {}): SchemaResult {
+  const mapper = createSchemaMapper(options);
   const schema = mapper.mapType(type);
   return { schema, components: mapper.components };
 }
 
 /** Create a mapper that keeps component names stable across multiple mapped types. */
-export function createSchemaMapper(): SchemaMapper {
+export function createSchemaMapper(options: SchemaMapperOptions = {}): SchemaMapper {
   const context: SchemaContext = {
     components: {},
     componentNamesByTypeId: new Map<number, string>(),
@@ -36,6 +41,7 @@ export function createSchemaMapper(): SchemaMapper {
     inProgressTypeIds: new Set<number>(),
     inliningTypeIds: new Set<number>(),
     warnedCollisions: new Set<string>(),
+    descriptions: options.descriptions ?? false,
   };
 
   return {
@@ -67,6 +73,7 @@ interface SchemaContext {
   inProgressTypeIds: Set<number>;
   inliningTypeIds: Set<number>;
   warnedCollisions: Set<string>;
+  descriptions: boolean;
 }
 
 function uniqueComponentName(baseName: string, usedNames: Set<string>): string {
@@ -283,7 +290,13 @@ function objectSchema(type: Type, context: SchemaContext): Schema {
     const declaration = prop.getDeclarations()[0];
     if (!declaration) continue;
     const propType = prop.getTypeAtLocation(declaration);
-    properties[prop.getName()] = toSchema(propType, context);
+    const propSchema = toSchema(propType, context);
+    if (context.descriptions) {
+      const docs = jsDocText(declaration);
+      const description = [docs.summary, docs.description].filter(Boolean).join('\n');
+      if (description) propSchema.description = description;
+    }
+    properties[prop.getName()] = propSchema;
     const optional = Node.isPropertySignature(declaration) && declaration.hasQuestionToken();
     if (!optional) required.push(prop.getName());
   }

@@ -12,3 +12,18 @@ test('generate produces the expected OpenAPI document for the sample project', (
   const expected = JSON.parse(readFileSync(join(sampleDir, 'expected-openapi.json'), 'utf8'));
   expect(doc).toEqual(expected);
 });
+
+test('generate can include JSDoc descriptions when enabled', () => {
+  const doc = generate(
+    join(sampleDir, 'tsconfig.json'),
+    { title: 'Sample', version: '1.0.0' },
+    { descriptions: true },
+  ) as any;
+
+  const get = doc.paths['/users/{id}'].get;
+  expect(get.summary).toBe('Get a user by id.');
+  expect(get.description).toBe('Returns the public user profile.');
+  expect(doc.components.schemas.CreateUserInput.properties.name.description).toBe(
+    'Full display name.',
+  );
+});

@@ -12,7 +12,8 @@ cli
   .option('-f, --format <fmt>', 'Output format: json | yaml', { default: 'json' })
   .option('--title <title>', 'API title', { default: 'API' })
   .option('--api-version <version>', 'API version', { default: '1.0.0' })
-  .action((tsconfig: string | undefined, options: { out: string; format: string; title: string; apiVersion: string }) => {
+  .option('--descriptions', 'Include JSDoc summaries, descriptions, deprecation, and property descriptions')
+  .action((tsconfig: string | undefined, options: { out: string; format: string; title: string; apiVersion: string; descriptions?: boolean }) => {
     if (options.format !== 'json' && options.format !== 'yaml') {
       console.error(`Invalid format "${options.format}": expected "json" or "yaml"`);
       process.exitCode = 1;
@@ -23,7 +24,7 @@ cli
       const doc = generate(tsconfig ?? 'tsconfig.json', {
         title: options.title,
         version: options.apiVersion,
-      });
+      }, { descriptions: options.descriptions ?? false });
       const serialized = options.format === 'yaml' ? stringify(doc) : `${JSON.stringify(doc, null, 2)}\n`;
       writeFileSync(options.out, serialized);
       console.log(`Wrote ${options.out}`);
