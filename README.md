@@ -73,6 +73,7 @@ npm install --save-dev ts-route-openapi
 
 ```sh
 npx ts-route-openapi [tsconfig] -o openapi.json -f json --title "My API" --api-version 1.0.0
+npx ts-route-openapi [tsconfig] -o openapi.yaml -f yaml --watch
 ```
 
 | Flag                      | Default         | Description                           |
@@ -83,6 +84,7 @@ npx ts-route-openapi [tsconfig] -o openapi.json -f json --title "My API" --api-v
 | `--title <title>`         | `API`           | Spec `info.title`                     |
 | `--api-version <version>` | `1.0.0`         | Spec `info.version`                   |
 | `--descriptions`          | off             | Include JSDoc summaries, descriptions, deprecation, and property descriptions |
+| `-w, --watch`             | off             | Regenerate when project source files change |
 
 ## Programmatic usage
 
