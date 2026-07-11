@@ -8,11 +8,34 @@ export interface SchemaResult {
   components: Components;
 }
 
+export interface SchemaMapper {
+  components: Components;
+  mapType(type: Type): Schema;
+}
+
 /** Convert a TS type to an OpenAPI schema, hoisting named object types into components. */
 export function mapType(type: Type): SchemaResult {
-  const components: Components = {};
-  const schema = toSchema(type, components, new Set<string>(), new Set<number>());
-  return { schema, components };
+  const mapper = createSchemaMapper();
+  const schema = mapper.mapType(type);
+  return { schema, components: mapper.components };
+}
+
+/** Create a mapper that keeps component names stable across multiple mapped types. */
+export function createSchemaMapper(): SchemaMapper {
+  const context: SchemaContext = {
+    components: {},
+    componentNamesByTypeId: new Map<number, string>(),
+    usedComponentNames: new Set<string>(),
+    inProgressTypeIds: new Set<number>(),
+    inliningTypeIds: new Set<number>(),
+  };
+
+  return {
+    components: context.components,
+    mapType(type: Type): Schema {
+      return toSchema(type, context);
+    },
+  };
 }
 
 /** Identity of a type for cycle detection while inlining (compiler-internal id). */
@@ -28,7 +51,28 @@ function symbolFromProjectSource(symbol: ReturnType<Type['getSymbol']>): boolean
   );
 }
 
-function toSchema(type: Type, components: Components, seen: Set<string>, inlining: Set<number>): Schema {
+interface SchemaContext {
+  components: Components;
+  componentNamesByTypeId: Map<number, string>;
+  usedComponentNames: Set<string>;
+  inProgressTypeIds: Set<number>;
+  inliningTypeIds: Set<number>;
+}
+
+function uniqueComponentName(baseName: string, usedNames: Set<string>): string {
+  if (!usedNames.has(baseName)) {
+    usedNames.add(baseName);
+    return baseName;
+  }
+
+  let suffix = 2;
+  while (usedNames.has(`${baseName}${suffix}`)) suffix += 1;
+  const name = `${baseName}${suffix}`;
+  usedNames.add(name);
+  return name;
+}
+
+function toSchema(type: Type, context: SchemaContext): Schema {
   if (type.isString()) return { type: 'string' };
   if (type.isNumber()) return { type: 'number' };
   if (type.isBoolean()) return { type: 'boolean' };
@@ -37,7 +81,7 @@ function toSchema(type: Type, components: Components, seen: Set<string>, inlinin
   if (type.isArray()) {
     return {
       type: 'array',
-      items: toSchema(type.getArrayElementTypeOrThrow(), components, seen, inlining),
+      items: toSchema(type.getArrayElementTypeOrThrow(), context),
     };
   }
 
@@ -63,7 +107,7 @@ function toSchema(type: Type, components: Components, seen: Set<string>, inlinin
     if (stringLiterals.length > 0) schemas.push({ type: 'string', enum: stringLiterals });
     if (numberLiterals.length > 0) schemas.push({ type: 'number', enum: numberLiterals });
     if (hasBoolean) schemas.push({ type: 'boolean' });
-    for (const other of others) schemas.push(toSchema(other, components, seen, inlining));
+    for (const other of others) schemas.push(toSchema(other, context));
 
     if (schemas.length === 0) return {};
     if (schemas.length === 1) return schemas[0];
@@ -93,33 +137,42 @@ function toSchema(type: Type, components: Components, seen: Set<string>, inlinin
     const hoistName = aliasName ?? symbolName;
 
     if (hoistName) {
-      if (!seen.has(hoistName)) {
-        seen.add(hoistName);
-        components[hoistName] = objectSchema(type, components, seen, inlining);
+      const id = typeId(type);
+      let componentName = context.componentNamesByTypeId.get(id);
+
+      if (!componentName) {
+        componentName = uniqueComponentName(hoistName, context.usedComponentNames);
+        context.componentNamesByTypeId.set(id, componentName);
       }
-      return { $ref: `#/components/schemas/${hoistName}` };
+
+      if (!Object.hasOwn(context.components, componentName)) {
+        context.components[componentName] = {};
+      }
+
+      if (!context.inProgressTypeIds.has(id) && Object.keys(context.components[componentName]).length === 0) {
+        context.inProgressTypeIds.add(id);
+        context.components[componentName] = objectSchema(type, context);
+        context.inProgressTypeIds.delete(id);
+      }
+
+      return { $ref: `#/components/schemas/${componentName}` };
     }
 
     // Inlined (non-hoisted) objects can be self-referential — e.g. recursive
     // type aliases or library types like express's Request. Truncate cycles
     // to an empty schema instead of recursing forever.
     const id = typeId(type);
-    if (inlining.has(id)) return {};
-    inlining.add(id);
-    const schema = objectSchema(type, components, seen, inlining);
-    inlining.delete(id);
+    if (context.inliningTypeIds.has(id)) return {};
+    context.inliningTypeIds.add(id);
+    const schema = objectSchema(type, context);
+    context.inliningTypeIds.delete(id);
     return schema;
   }
 
   return {};
 }
 
-function objectSchema(
-  type: Type,
-  components: Components,
-  seen: Set<string>,
-  inlining: Set<number>,
-): Schema {
+function objectSchema(type: Type, context: SchemaContext): Schema {
   const properties: Record<string, Schema> = {};
   const required: string[] = [];
 
@@ -127,7 +180,7 @@ function objectSchema(
     const declaration = prop.getDeclarations()[0];
     if (!declaration) continue;
     const propType = prop.getTypeAtLocation(declaration);
-    properties[prop.getName()] = toSchema(propType, components, seen, inlining);
+    properties[prop.getName()] = toSchema(propType, context);
     const optional = Node.isPropertySignature(declaration) && declaration.hasQuestionToken();
     if (!optional) required.push(prop.getName());
   }

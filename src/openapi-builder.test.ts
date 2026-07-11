@@ -49,3 +49,36 @@ test('builds an OpenAPI doc with templated path, params, body and response', () 
   });
   expect(doc.components.schemas.CreateInput).toBeDefined();
 });
+
+test('keeps same-named components distinct across route inputs', () => {
+  const project = new Project({ useInMemoryFileSystem: true });
+  const sf = project.createSourceFile(
+    'types.ts',
+    `namespace A { export interface User { a: string } }
+     namespace B { export interface User { b: number } }
+     declare const a: A.User;
+     declare const b: B.User;`,
+  );
+  const aType = sf.getVariableDeclarationOrThrow('a').getType();
+  const bType = sf.getVariableDeclarationOrThrow('b').getType();
+
+  const doc = buildOpenApi([
+    {
+      route: { verb: 'post', path: '/a' } as any,
+      types: { pathParams: [], query: [], body: aType, responses: [{ status: 200 }] },
+    },
+    {
+      route: { verb: 'post', path: '/b' } as any,
+      types: { pathParams: [], query: [], body: bType, responses: [{ status: 200 }] },
+    },
+  ]) as any;
+
+  expect(doc.paths['/a'].post.requestBody.content['application/json'].schema).toEqual({
+    $ref: '#/components/schemas/User',
+  });
+  expect(doc.paths['/b'].post.requestBody.content['application/json'].schema).toEqual({
+    $ref: '#/components/schemas/User2',
+  });
+  expect(doc.components.schemas.User.properties).toEqual({ a: { type: 'string' } });
+  expect(doc.components.schemas.User2.properties).toEqual({ b: { type: 'number' } });
+});
