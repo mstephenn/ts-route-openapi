@@ -262,3 +262,35 @@ test('dedupes same-named project types with identical schemas', () => {
   expect(warn).not.toHaveBeenCalled();
   warn.mockRestore();
 });
+
+test('dedupes same-named recursive project types with identical schemas', () => {
+  const project = new Project({ useInMemoryFileSystem: true });
+  project.createSourceFile('/public.ts', `export interface Node { id: string; next?: Node }`);
+  project.createSourceFile('/admin.ts', `export interface Node { id: string; next?: Node }`);
+  const sf = project.createSourceFile(
+    '/t.ts',
+    `import type { Node as PublicNode } from './public';
+     import type { Node as AdminNode } from './admin';
+     declare const value: PublicNode | AdminNode;`,
+  );
+  const type = sf.getVariableDeclarationOrThrow('value').getType();
+  const warn = vi.spyOn(console, 'warn').mockImplementation(() => undefined);
+
+  const result = mapType(type);
+
+  expect(result.schema).toEqual({
+    oneOf: [{ $ref: '#/components/schemas/Node' }, { $ref: '#/components/schemas/Node' }],
+  });
+  expect(result.components).toEqual({
+    Node: {
+      type: 'object',
+      properties: {
+        id: { type: 'string' },
+        next: { $ref: '#/components/schemas/Node' },
+      },
+      required: ['id'],
+    },
+  });
+  expect(warn).not.toHaveBeenCalled();
+  warn.mockRestore();
+});

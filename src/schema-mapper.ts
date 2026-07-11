@@ -107,23 +107,39 @@ function declarationModuleSuffix(type: Type): string | undefined {
   return sanitized || undefined;
 }
 
-function stableSchemaString(schema: Schema): string {
-  return JSON.stringify(stableValue(schema));
+function stableSchemaString(schema: Schema, ownName?: string, baseName?: string): string {
+  return JSON.stringify(stableValue(schema, ownName, baseName));
 }
 
-function stableValue(value: unknown): unknown {
-  if (Array.isArray(value)) return value.map(stableValue);
+function stableValue(value: unknown, ownName?: string, baseName?: string): unknown {
+  if (Array.isArray(value)) return value.map((entry) => stableValue(entry, ownName, baseName));
   if (!value || typeof value !== 'object') return value;
 
+  const objectValue = value as Record<string, unknown>;
+  if (
+    typeof objectValue.$ref === 'string' &&
+    ownName &&
+    baseName &&
+    objectValue.$ref === `#/components/schemas/${ownName}`
+  ) {
+    return { ...objectValue, $ref: `#/components/schemas/${baseName}` };
+  }
+
   return Object.fromEntries(
-    Object.entries(value as Record<string, unknown>)
+    Object.entries(objectValue)
       .sort(([a], [b]) => a.localeCompare(b))
-      .map(([key, entry]) => [key, stableValue(entry)]),
+      .map(([key, entry]) => [key, stableValue(entry, ownName, baseName)]),
   );
 }
 
-function schemasEqual(a: Schema, b: Schema): boolean {
-  return stableSchemaString(a) === stableSchemaString(b);
+function schemasEqual(
+  a: Schema,
+  b: Schema,
+  aOwnName: string,
+  bOwnName: string,
+  baseName: string,
+): boolean {
+  return stableSchemaString(a, aOwnName, baseName) === stableSchemaString(b, bOwnName, baseName);
 }
 
 function warnCollisionOnce(baseName: string, componentName: string, context: SchemaContext): void {
@@ -221,8 +237,11 @@ function toSchema(type: Type, context: SchemaContext): Schema {
         const schema = objectSchema(type, context);
         context.inProgressTypeIds.delete(id);
 
+        const candidateName = componentName;
         const records = context.componentRecordsByBaseName.get(hoistName) ?? [];
-        const duplicate = records.find((record) => schemasEqual(record.schema, schema));
+        const duplicate = records.find((record) =>
+          schemasEqual(record.schema, schema, record.name, candidateName, hoistName),
+        );
         if (duplicate) {
           delete context.components[componentName];
           context.usedComponentNames.delete(componentName);
