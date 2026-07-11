@@ -3,6 +3,12 @@ import { Node, type Type } from 'ts-morph';
 type Schema = Record<string, unknown>;
 type Components = Record<string, Schema>;
 
+interface ComponentRecord {
+  baseName: string;
+  name: string;
+  schema: Schema;
+}
+
 export interface SchemaResult {
   schema: Schema;
   components: Components;
@@ -25,9 +31,11 @@ export function createSchemaMapper(): SchemaMapper {
   const context: SchemaContext = {
     components: {},
     componentNamesByTypeId: new Map<number, string>(),
+    componentRecordsByBaseName: new Map<string, ComponentRecord[]>(),
     usedComponentNames: new Set<string>(),
     inProgressTypeIds: new Set<number>(),
     inliningTypeIds: new Set<number>(),
+    warnedCollisions: new Set<string>(),
   };
 
   return {
@@ -54,9 +62,11 @@ function symbolFromProjectSource(symbol: ReturnType<Type['getSymbol']>): boolean
 interface SchemaContext {
   components: Components;
   componentNamesByTypeId: Map<number, string>;
+  componentRecordsByBaseName: Map<string, ComponentRecord[]>;
   usedComponentNames: Set<string>;
   inProgressTypeIds: Set<number>;
   inliningTypeIds: Set<number>;
+  warnedCollisions: Set<string>;
 }
 
 function uniqueComponentName(baseName: string, usedNames: Set<string>): string {
@@ -70,6 +80,59 @@ function uniqueComponentName(baseName: string, usedNames: Set<string>): string {
   const name = `${baseName}${suffix}`;
   usedNames.add(name);
   return name;
+}
+
+function disambiguatedComponentName(baseName: string, type: Type, usedNames: Set<string>): string {
+  const suffix = declarationModuleSuffix(type) ?? 'variant';
+  const preferred = `${baseName}_${suffix}`;
+  if (!usedNames.has(preferred)) {
+    usedNames.add(preferred);
+    return preferred;
+  }
+
+  let index = 2;
+  while (usedNames.has(`${preferred}${index}`)) index += 1;
+  const name = `${preferred}${index}`;
+  usedNames.add(name);
+  return name;
+}
+
+function declarationModuleSuffix(type: Type): string | undefined {
+  const declaration = type.getAliasSymbol()?.getDeclarations()[0] ?? type.getSymbol()?.getDeclarations()[0];
+  const sourceFile = declaration?.getSourceFile();
+  if (!sourceFile) return undefined;
+
+  const fileName = sourceFile.getBaseNameWithoutExtension();
+  const sanitized = fileName.replace(/[^A-Za-z0-9]+/g, '_').replace(/^_+|_+$/g, '');
+  return sanitized || undefined;
+}
+
+function stableSchemaString(schema: Schema): string {
+  return JSON.stringify(stableValue(schema));
+}
+
+function stableValue(value: unknown): unknown {
+  if (Array.isArray(value)) return value.map(stableValue);
+  if (!value || typeof value !== 'object') return value;
+
+  return Object.fromEntries(
+    Object.entries(value as Record<string, unknown>)
+      .sort(([a], [b]) => a.localeCompare(b))
+      .map(([key, entry]) => [key, stableValue(entry)]),
+  );
+}
+
+function schemasEqual(a: Schema, b: Schema): boolean {
+  return stableSchemaString(a) === stableSchemaString(b);
+}
+
+function warnCollisionOnce(baseName: string, componentName: string, context: SchemaContext): void {
+  const key = `${baseName}:${componentName}`;
+  if (context.warnedCollisions.has(key)) return;
+  context.warnedCollisions.add(key);
+  console.warn(
+    `ts-route-openapi: component name collision for "${baseName}"; emitted "${componentName}" for a distinct schema.`,
+  );
 }
 
 function toSchema(type: Type, context: SchemaContext): Schema {
@@ -141,7 +204,11 @@ function toSchema(type: Type, context: SchemaContext): Schema {
       let componentName = context.componentNamesByTypeId.get(id);
 
       if (!componentName) {
-        componentName = uniqueComponentName(hoistName, context.usedComponentNames);
+        const existingRecords = context.componentRecordsByBaseName.get(hoistName) ?? [];
+        componentName =
+          existingRecords.length === 0
+            ? uniqueComponentName(hoistName, context.usedComponentNames)
+            : disambiguatedComponentName(hoistName, type, context.usedComponentNames);
         context.componentNamesByTypeId.set(id, componentName);
       }
 
@@ -151,8 +218,25 @@ function toSchema(type: Type, context: SchemaContext): Schema {
 
       if (!context.inProgressTypeIds.has(id) && Object.keys(context.components[componentName]).length === 0) {
         context.inProgressTypeIds.add(id);
-        context.components[componentName] = objectSchema(type, context);
+        const schema = objectSchema(type, context);
         context.inProgressTypeIds.delete(id);
+
+        const records = context.componentRecordsByBaseName.get(hoistName) ?? [];
+        const duplicate = records.find((record) => schemasEqual(record.schema, schema));
+        if (duplicate) {
+          delete context.components[componentName];
+          context.usedComponentNames.delete(componentName);
+          context.componentNamesByTypeId.set(id, duplicate.name);
+          componentName = duplicate.name;
+        } else {
+          context.components[componentName] = schema;
+          records.push({ baseName: hoistName, name: componentName, schema });
+          context.componentRecordsByBaseName.set(hoistName, records);
+
+          if (records.length > 1) {
+            warnCollisionOnce(hoistName, componentName, context);
+          }
+        }
       }
 
       return { $ref: `#/components/schemas/${componentName}` };

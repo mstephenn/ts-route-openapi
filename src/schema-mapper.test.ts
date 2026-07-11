@@ -1,5 +1,5 @@
 import { Project, type Type } from 'ts-morph';
-import { expect, test } from 'vitest';
+import { expect, test, vi } from 'vitest';
 import { mapType } from './schema-mapper.js';
 
 /** Build a Type from the annotation of `declare const value: <annotation>`. */
@@ -202,29 +202,63 @@ test('discriminated object unions hoist members and reference them in oneOf', ()
 
 test('disambiguates distinct project types that share a component name', () => {
   const project = new Project({ useInMemoryFileSystem: true });
-  project.createSourceFile('/a.ts', `export interface User { a: string }`);
-  project.createSourceFile('/b.ts', `export interface User { b: number }`);
+  project.createSourceFile('/public.ts', `export interface User { a: string }`);
+  project.createSourceFile('/admin.ts', `export interface User { b: number }`);
   const sf = project.createSourceFile(
     '/t.ts',
-    `import type { User as AUser } from './a';
-     import type { User as BUser } from './b';
+    `import type { User as AUser } from './public';
+     import type { User as BUser } from './admin';
      declare const value: AUser | BUser;`,
   );
   const type = sf.getVariableDeclarationOrThrow('value').getType();
+  const warn = vi.spyOn(console, 'warn').mockImplementation(() => undefined);
 
   const result = mapType(type);
 
   expect(result.schema).toEqual({
-    oneOf: [{ $ref: '#/components/schemas/User' }, { $ref: '#/components/schemas/User2' }],
+    oneOf: [{ $ref: '#/components/schemas/User' }, { $ref: '#/components/schemas/User_admin' }],
   });
   expect(result.components.User).toEqual({
     type: 'object',
     properties: { a: { type: 'string' } },
     required: ['a'],
   });
-  expect(result.components.User2).toEqual({
+  expect(result.components.User_admin).toEqual({
     type: 'object',
     properties: { b: { type: 'number' } },
     required: ['b'],
   });
+  expect(warn).toHaveBeenCalledWith(
+    'ts-route-openapi: component name collision for "User"; emitted "User_admin" for a distinct schema.',
+  );
+  warn.mockRestore();
+});
+
+test('dedupes same-named project types with identical schemas', () => {
+  const project = new Project({ useInMemoryFileSystem: true });
+  project.createSourceFile('/public.ts', `export interface User { id: string }`);
+  project.createSourceFile('/admin.ts', `export interface User { id: string }`);
+  const sf = project.createSourceFile(
+    '/t.ts',
+    `import type { User as PublicUser } from './public';
+     import type { User as AdminUser } from './admin';
+     declare const value: PublicUser | AdminUser;`,
+  );
+  const type = sf.getVariableDeclarationOrThrow('value').getType();
+  const warn = vi.spyOn(console, 'warn').mockImplementation(() => undefined);
+
+  const result = mapType(type);
+
+  expect(result.schema).toEqual({
+    oneOf: [{ $ref: '#/components/schemas/User' }, { $ref: '#/components/schemas/User' }],
+  });
+  expect(result.components).toEqual({
+    User: {
+      type: 'object',
+      properties: { id: { type: 'string' } },
+      required: ['id'],
+    },
+  });
+  expect(warn).not.toHaveBeenCalled();
+  warn.mockRestore();
 });
