@@ -4,12 +4,7 @@ import { fileURLToPath } from 'node:url';
 import { dirname, join } from 'node:path';
 import { expect, test } from 'vitest';
 import { generate } from '../src/generate.js';
-import type { OpenApiDocument } from '../src/openapi-types.js';
-
-/** The `properties` of an object-shaped SchemaObject (`schema-mapper` keeps schema shapes untyped). */
-function schemaProperties(schema: unknown): Record<string, unknown> {
-  return (schema as { properties: Record<string, unknown> }).properties;
-}
+import { getOperation, schemaProperties } from './support/openapi.js';
 
 const here = dirname(fileURLToPath(import.meta.url));
 const sampleDir = join(here, '__fixtures__', 'sample');
@@ -25,9 +20,9 @@ test('generate can include JSDoc descriptions when enabled', () => {
     join(sampleDir, 'tsconfig.json'),
     { title: 'Sample', version: '1.0.0' },
     { descriptions: true },
-  ) as unknown as OpenApiDocument;
+  );
 
-  const get = doc.paths['/users/{id}'].get!;
+  const get = getOperation(doc, '/users/{id}', 'get');
   expect(get.summary).toBe('Get a user by id.');
   expect(get.description).toBe('Returns the public user profile.');
   const nameProperty = schemaProperties(doc.components!.schemas!.CreateUserInput).name;
@@ -58,12 +53,12 @@ test('generate discovers security config next to the tsconfig', () => {
     }),
   );
 
-  const doc = generate(join(dir, 'tsconfig.json')) as unknown as OpenApiDocument;
+  const doc = generate(join(dir, 'tsconfig.json'));
 
   expect(doc.components!.securitySchemes!.apiKeyAuth).toEqual({
     type: 'apiKey',
     in: 'header',
     name: 'x-api-key',
   });
-  expect(doc.paths['/health'].get!.security).toEqual([{ apiKeyAuth: [] }]);
+  expect(getOperation(doc, '/health', 'get').security).toEqual([{ apiKeyAuth: [] }]);
 });

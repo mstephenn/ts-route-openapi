@@ -1,6 +1,11 @@
 import type { SecurityRequirement } from './config.js';
 import type { HttpVerb } from './types.js';
 
+export interface ApiInfo {
+  title: string;
+  version: string;
+}
+
 /** An OpenAPI Schema Object — deliberately kept loose; schema-mapper owns its own shape. */
 export type SchemaObject = Record<string, unknown>;
 
@@ -43,7 +48,7 @@ export interface ComponentsObject {
 
 export interface OpenApiDocument {
   openapi: '3.0.3';
-  info: { title: string; version: string };
+  info: ApiInfo;
   paths: Record<string, PathItemObject>;
   components?: ComponentsObject;
 }

@@ -4,6 +4,7 @@ import { jsDocText } from './jsdoc.js';
 import type { GeneratorConfig, SecurityRequirement } from './config.js';
 import type { ParamType, ResolvedRoute, RouteTypes } from './types.js';
 import type {
+  ApiInfo,
   ComponentsObject,
   OpenApiDocument,
   OperationObject,
@@ -13,14 +14,11 @@ import type {
   SchemaObject,
 } from './openapi-types.js';
 
+export type { ApiInfo } from './openapi-types.js';
+
 export interface RouteInput {
   route: ResolvedRoute;
   types: RouteTypes;
-}
-
-export interface ApiInfo {
-  title: string;
-  version: string;
 }
 
 export interface BuildOptions {
@@ -40,12 +38,12 @@ export function buildOpenApi(
   inputs: RouteInput[],
   info: ApiInfo = { title: 'API', version: '1.0.0' },
   options: BuildOptions = {},
-): Record<string, unknown> {
+): OpenApiDocument {
   const paths: Record<string, PathItemObject> = {};
   const schemaMapper = createSchemaMapper({ descriptions: options.descriptions });
 
   for (const { route, types } of inputs) {
-    const operation: OperationObject = { responses: {} };
+    const operation: Partial<OperationObject> = {};
     if (options.descriptions) {
       const docs = jsDocText(route.method);
       if (docs.summary) operation.summary = docs.summary;
@@ -90,7 +88,7 @@ export function buildOpenApi(
 
     const oaPath = templatePath(route.path);
     paths[oaPath] ??= {};
-    paths[oaPath][route.verb] = operation;
+    paths[oaPath][route.verb] = operation as OperationObject;
   }
 
   const doc: OpenApiDocument = { openapi: '3.0.3', info, paths };
@@ -104,7 +102,7 @@ export function buildOpenApi(
   if (Object.keys(components).length > 0) {
     doc.components = components;
   }
-  return doc as unknown as Record<string, unknown>;
+  return doc;
 }
 
 function operationSecurity(
