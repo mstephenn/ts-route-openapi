@@ -38,10 +38,19 @@ export interface ParamType {
   type?: Type;
 }
 
+/** One documented response: a status code and (optionally) its payload type. */
+export interface ResponseType {
+  status: number;
+  type?: Type;
+}
+
 /** Types extracted from a resolved route's handler signature. */
 export interface RouteTypes {
   pathParams: ParamType[];
   query: ParamType[];
   body?: Type;
+  /** Single-status shorthand: documented as the 200 response when `responses` is absent. */
   response?: Type;
+  /** Explicit multi-status responses; takes precedence over `response`. */
+  responses?: ResponseType[];
 }

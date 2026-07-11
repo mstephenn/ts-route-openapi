@@ -18,6 +18,8 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/Order"
+        "404":
+          description: Not Found
   /orders:
     get:
       parameters:
@@ -42,8 +44,8 @@ paths:
             schema:
               $ref: "#/components/schemas/CreateOrderInput"
       responses:
-        "200":
-          description: OK
+        "201":
+          description: Created
           content:
             application/json:
               schema:

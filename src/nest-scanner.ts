@@ -43,7 +43,7 @@ export function scanNestRoutes(project: Project): NestRoute[] {
               handlerName: method.getName(),
               method,
             },
-            types: extractNestTypes(method),
+            types: extractNestTypes(method, verb),
           });
         }
       }
@@ -64,7 +64,15 @@ function joinPaths(base: string, sub: string): string {
   return `/${joined}`;
 }
 
-function extractNestTypes(method: MethodDeclaration): RouteTypes {
+/** Nest's status: @HttpCode(N) wins; otherwise POST defaults to 201, everything else 200. */
+function nestStatus(method: MethodDeclaration, verb: HttpVerb): number {
+  const decorator = method.getDecorator('HttpCode');
+  const arg = decorator?.getArguments()[0];
+  if (arg && Node.isNumericLiteral(arg)) return Number(arg.getLiteralValue());
+  return verb === 'post' ? 201 : 200;
+}
+
+function extractNestTypes(method: MethodDeclaration, verb: HttpVerb): RouteTypes {
   const pathParams: ParamType[] = [];
   const query: ParamType[] = [];
   let body: RouteTypes['body'];
@@ -94,10 +102,14 @@ function extractNestTypes(method: MethodDeclaration): RouteTypes {
     }
   }
 
+  const response = usableResponse(unwrapPromise(method.getReturnType()));
+  const status = nestStatus(method, verb);
+
   return {
     pathParams,
     query,
     body,
-    response: usableResponse(unwrapPromise(method.getReturnType())),
+    response,
+    responses: status !== 200 ? [{ status, type: response }] : undefined,
   };
 }

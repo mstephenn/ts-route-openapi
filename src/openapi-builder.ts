@@ -13,6 +13,20 @@ export interface ApiInfo {
 
 type Json = Record<string, unknown>;
 
+const REASON_PHRASES: Record<number, string> = {
+  200: 'OK',
+  201: 'Created',
+  202: 'Accepted',
+  204: 'No Content',
+  400: 'Bad Request',
+  401: 'Unauthorized',
+  403: 'Forbidden',
+  404: 'Not Found',
+  409: 'Conflict',
+  422: 'Unprocessable Entity',
+  500: 'Internal Server Error',
+};
+
 /** Convert `/orgs/:id/users` to the OpenAPI `/orgs/{id}/users` template form. */
 function templatePath(path: string): string {
   return path.replace(/:([A-Za-z0-9_]+)/g, '{$1}');
@@ -56,12 +70,15 @@ export function buildOpenApi(
     }
 
     const responses: Json = {};
-    if (types.response) {
-      const { schema, components: c } = mapType(types.response);
-      mergeComponents(c);
-      responses['200'] = { description: 'OK', content: { 'application/json': { schema } } };
-    } else {
-      responses['200'] = { description: 'OK' };
+    const entries = types.responses ?? [{ status: 200, type: types.response }];
+    for (const entry of entries) {
+      const response: Json = { description: REASON_PHRASES[entry.status] ?? 'Response' };
+      if (entry.type) {
+        const { schema, components: c } = mapType(entry.type);
+        mergeComponents(c);
+        response.content = { 'application/json': { schema } };
+      }
+      responses[String(entry.status)] = response;
     }
     operation.responses = responses;
 
