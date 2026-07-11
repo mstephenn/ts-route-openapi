@@ -82,6 +82,11 @@ function schemaExpressionToOpenApi(expression: Expression): Schema {
   return {};
 }
 
+/** Convert a Zod schema expression (e.g. the argument to tRPC's `.input(...)`/`.output(...)`) to its OpenAPI schema. */
+export function schemaFromZodExpression(expression: Expression): Schema {
+  return zodSchema(expression).schema;
+}
+
 function zodSchema(expression: Expression): ZodResult {
   const resolved = resolveInitializer(expression);
   if (resolved && resolved !== expression) return zodSchema(resolved);
