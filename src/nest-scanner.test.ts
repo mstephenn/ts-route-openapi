@@ -16,6 +16,8 @@ function projectWith(code: string): Project {
     export function Param(name?: string): ParameterDecorator { return () => {}; }
     export function Query(name?: string): ParameterDecorator { return () => {}; }
     export function Body(): ParameterDecorator { return () => {}; }
+    export function HttpCode(n: number): MethodDecorator { return () => {}; }
+    export function Delete(path?: string): MethodDecorator { return () => {}; }
     `,
   );
   project.createSourceFile('app.ts', code);
@@ -65,4 +67,54 @@ test('ignores classes without @Controller', () => {
     }
   `);
   expect(scanNestRoutes(project)).toEqual([]);
+});
+
+test('nest: POST defaults to 201 and @HttpCode overrides', () => {
+  const project = projectWith(`
+    import { Controller, Get, Post, Body, HttpCode } from './decorators.js';
+
+    @Controller('things')
+    class ThingsController {
+      @Post()
+      create(@Body() input: { name: string }): { id: string } {
+        return { id: 'x' };
+      }
+
+      @Post('bulk')
+      @HttpCode(202)
+      bulk(@Body() input: { items: string[] }): { accepted: boolean } {
+        return { accepted: true };
+      }
+
+      @Get()
+      list(): string[] { return []; }
+    }
+  `);
+
+  const routes = scanNestRoutes(project);
+  const byPathVerb = Object.fromEntries(routes.map((r) => [`${r.route.verb} ${r.route.path}`, r.types]));
+
+  expect(byPathVerb['post /things'].responses?.map((x) => x.status)).toEqual([201]);
+  expect(byPathVerb['post /things/bulk'].responses?.map((x) => x.status)).toEqual([202]);
+  expect(byPathVerb['get /things'].responses).toBeUndefined();
+});
+
+test('nest: @HttpCode(HttpStatus.NO_CONTENT) enum member resolves, and 204 responses drop the body', () => {
+  const project = projectWith(`
+    import { Controller, Delete, Param, HttpCode } from './decorators.js';
+
+    enum HttpStatus { NO_CONTENT = 204 }
+
+    @Controller('things')
+    class ThingsController {
+      @Delete(':id')
+      @HttpCode(HttpStatus.NO_CONTENT)
+      remove(@Param('id') id: string): { removed: boolean } {
+        return { removed: true };
+      }
+    }
+  `);
+
+  const routes = scanNestRoutes(project);
+  expect(routes[0].types.responses?.map((x) => x.status)).toEqual([204]);
 });

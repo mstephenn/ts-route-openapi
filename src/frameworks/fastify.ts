@@ -9,6 +9,7 @@ import {
   usableObject,
   usableResponse,
 } from './shared.js';
+import { fastifyStatusResponses } from './status-calls.js';
 
 /**
  * Fastify: `(req: FastifyRequest<{ Params; Body; Querystring; Reply }>, reply)`.
@@ -25,12 +26,16 @@ export function extractFastify(
   const generic = usable(req.getType().getTypeArguments()[0]);
   const member = (name: string) => generic?.getProperty(name)?.getTypeAtLocation(req);
 
+  const response =
+    usableResponse(unwrapPromise(route.method.getReturnType())) ??
+    usableResponse(member('Reply'));
+  const responses = fastifyStatusResponses(route.method, params[1], response);
+
   return {
     pathParams: objectParams(member('Params'), req) ?? tokenParams(route),
     query: objectParams(member('Querystring'), req) ?? [],
     body: usableObject(member('Body')),
-    response:
-      usableResponse(unwrapPromise(route.method.getReturnType())) ??
-      usableResponse(member('Reply')),
+    response,
+    responses: responses.length > 0 ? responses : undefined,
   };
 }
