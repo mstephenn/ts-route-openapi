@@ -94,7 +94,7 @@ test('collapses an optional boolean property to a boolean schema', () => {
   expect(result.schema.required).toBeUndefined();
 });
 
-test('does not blow the stack on recursive inlined types (e.g. type aliases, lib types)', () => {
+test('recursive project-source aliases hoist and self-reference via $ref', () => {
   const project = new Project({ useInMemoryFileSystem: true });
   const sf = project.createSourceFile(
     't.ts',
@@ -104,9 +104,64 @@ test('does not blow the stack on recursive inlined types (e.g. type aliases, lib
 
   const result = mapType(type);
 
-  expect(result.schema).toEqual({
+  expect(result.schema).toEqual({ $ref: '#/components/schemas/LinkedNode' });
+  expect(result.components.LinkedNode).toEqual({
     type: 'object',
-    properties: { value: { type: 'string' }, next: {} },
+    properties: {
+      value: { type: 'string' },
+      next: { $ref: '#/components/schemas/LinkedNode' },
+    },
     required: ['value', 'next'],
   });
+});
+
+test('hoists named type aliases like interfaces', () => {
+  const project = new Project({ useInMemoryFileSystem: true });
+  const sf = project.createSourceFile(
+    't.ts',
+    `type User = { id: string; name?: string }; declare const value: User;`,
+  );
+  const type = sf.getVariableDeclarationOrThrow('value').getType();
+
+  const result = mapType(type);
+
+  expect(result.schema).toEqual({ $ref: '#/components/schemas/User' });
+  expect(result.components.User).toEqual({
+    type: 'object',
+    properties: { id: { type: 'string' }, name: { type: 'string' } },
+    required: ['id'],
+  });
+});
+
+test('aliases to unions keep their enum mapping (not hoisted)', () => {
+  const project = new Project({ useInMemoryFileSystem: true });
+  const sf = project.createSourceFile(
+    't.ts',
+    `type Status = 'a' | 'b'; declare const value: Status;`,
+  );
+  const type = sf.getVariableDeclarationOrThrow('value').getType();
+
+  expect(mapType(type).schema).toEqual({ type: 'string', enum: ['a', 'b'] });
+});
+
+test('does not blow the stack on recursive library types (inlined, cycle-truncated)', () => {
+  const project = new Project({ useInMemoryFileSystem: true });
+  project.createSourceFile(
+    '/node_modules/somelib/index.d.ts',
+    `export interface Chain { next: Chain; label: string }`,
+  );
+  const sf = project.createSourceFile(
+    '/t.ts',
+    `import type { Chain } from 'somelib'; declare const value: Chain;`,
+  );
+  const type = sf.getVariableDeclarationOrThrow('value').getType();
+
+  const result = mapType(type);
+
+  expect(result.schema).toEqual({
+    type: 'object',
+    properties: { next: {}, label: { type: 'string' } },
+    required: ['next', 'label'],
+  });
+  expect(result.components).toEqual({});
 });
