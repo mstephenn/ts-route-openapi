@@ -4,6 +4,7 @@ import { fileURLToPath } from 'node:url';
 import { dirname, join } from 'node:path';
 import { expect, test } from 'vitest';
 import { generate } from '../src/generate.js';
+import { getOperation, schemaProperties } from './support/openapi.js';
 
 const here = dirname(fileURLToPath(import.meta.url));
 const sampleDir = join(here, '__fixtures__', 'sample');
@@ -19,14 +20,13 @@ test('generate can include JSDoc descriptions when enabled', () => {
     join(sampleDir, 'tsconfig.json'),
     { title: 'Sample', version: '1.0.0' },
     { descriptions: true },
-  ) as any;
+  );
 
-  const get = doc.paths['/users/{id}'].get;
+  const get = getOperation(doc, '/users/{id}', 'get');
   expect(get.summary).toBe('Get a user by id.');
   expect(get.description).toBe('Returns the public user profile.');
-  expect(doc.components.schemas.CreateUserInput.properties.name.description).toBe(
-    'Full display name.',
-  );
+  const nameProperty = schemaProperties(doc.components!.schemas!.CreateUserInput).name;
+  expect((nameProperty as { description: string }).description).toBe('Full display name.');
 });
 
 test('generate discovers security config next to the tsconfig', () => {
@@ -53,12 +53,12 @@ test('generate discovers security config next to the tsconfig', () => {
     }),
   );
 
-  const doc = generate(join(dir, 'tsconfig.json')) as any;
+  const doc = generate(join(dir, 'tsconfig.json'));
 
-  expect(doc.components.securitySchemes.apiKeyAuth).toEqual({
+  expect(doc.components!.securitySchemes!.apiKeyAuth).toEqual({
     type: 'apiKey',
     in: 'header',
     name: 'x-api-key',
   });
-  expect(doc.paths['/health'].get.security).toEqual([{ apiKeyAuth: [] }]);
+  expect(getOperation(doc, '/health', 'get').security).toEqual([{ apiKeyAuth: [] }]);
 });

@@ -5,6 +5,7 @@ import { extractTypes } from './type-extractor.js';
 import { scanNestRoutes } from './nest-scanner.js';
 import { buildOpenApi, type ApiInfo, type BuildOptions, type RouteInput } from './openapi-builder.js';
 import { loadConfig, type GeneratorConfig } from './config.js';
+import type { OpenApiDocument } from './openapi-types.js';
 
 export interface GenerateOptions extends Omit<BuildOptions, 'config'> {
   config?: GeneratorConfig;
@@ -15,7 +16,7 @@ export function generate(
   tsconfigPath: string,
   info?: ApiInfo,
   options: GenerateOptions = {},
-): Record<string, unknown> {
+): OpenApiDocument {
   const project = loadProject(tsconfigPath);
   const inputs: RouteInput[] = [];
 
