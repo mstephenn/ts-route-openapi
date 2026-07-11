@@ -1,6 +1,6 @@
 import type { Type } from 'ts-morph';
+import type { Schema } from './types.js';
 
-type Schema = Record<string, unknown>;
 type Components = Record<string, Schema>;
 
 interface ComponentRecord {
