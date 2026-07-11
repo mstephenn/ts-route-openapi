@@ -292,7 +292,8 @@ function objectSchema(type: Type, context: SchemaContext): Schema {
     const propType = prop.getTypeAtLocation(declaration);
     const propSchema = toSchema(propType, context);
     if (context.descriptions) {
-      const description = jsDocText(declaration).summary;
+      const docs = jsDocText(declaration);
+      const description = [docs.summary, docs.description].filter(Boolean).join('\n');
       if (description) propSchema.description = description;
     }
     properties[prop.getName()] = propSchema;

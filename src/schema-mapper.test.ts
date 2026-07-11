@@ -56,7 +56,10 @@ test('adds property descriptions from JSDoc when enabled', () => {
   const sf = project.createSourceFile(
     't.ts',
     `interface User {
-       /** User display name. */
+       /**
+        * User display name.
+        * Shown in profile pages.
+        */
        name: string
      }
      declare const value: User;`,
@@ -66,7 +69,7 @@ test('adds property descriptions from JSDoc when enabled', () => {
   const result = mapType(type, { descriptions: true });
 
   expect(result.components.User.properties).toEqual({
-    name: { type: 'string', description: 'User display name.' },
+    name: { type: 'string', description: 'User display name.\nShown in profile pages.' },
   });
 });
 
