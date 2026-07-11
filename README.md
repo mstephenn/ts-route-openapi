@@ -161,6 +161,16 @@ and framework-free examples — each with its generated `openapi.yaml`
 committed — live in [`examples/`](./examples). No adapters or code changes:
 install, run the CLI, get the spec.
 
+## Contributing
+
+Planning work lives in the
+[`ts-route-openapi Plan`](https://github.com/users/mstephenn/projects/2)
+GitHub Project, not long-lived plan documents in the repository. The `main`
+branch is protected; send changes through pull requests and keep review threads
+resolved before merging.
+
+See [`CONTRIBUTING.md`](./CONTRIBUTING.md) for the full workflow.
+
 ## Limitations (MVP scope)
 
 - **Validator-middleware types are not read**: schemas defined in Zod/TypeBox
@@ -170,9 +180,6 @@ install, run the CLI, get the spec.
   `reply.code(N)` / `@HttpCode(N)` produce per-status responses, but
   statuses set by middleware, error filters, or thrown exceptions are not
   seen. No auth documentation yet.
-- **Component name collisions are last-write-wins**: if two distinct types in
-  the project share a name, whichever is hoisted last silently overwrites the
-  earlier component in `components.schemas`. There is no collision detection.
 - **Callable types** (functions, methods) map to an empty schema (`{}`)
   rather than being described.
 
