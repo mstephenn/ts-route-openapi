@@ -199,3 +199,32 @@ test('discriminated object unions hoist members and reference them in oneOf', ()
   });
   expect(Object.keys(result.components).sort()).toEqual(['Cat', 'Dog']);
 });
+
+test('disambiguates distinct project types that share a component name', () => {
+  const project = new Project({ useInMemoryFileSystem: true });
+  project.createSourceFile('/a.ts', `export interface User { a: string }`);
+  project.createSourceFile('/b.ts', `export interface User { b: number }`);
+  const sf = project.createSourceFile(
+    '/t.ts',
+    `import type { User as AUser } from './a';
+     import type { User as BUser } from './b';
+     declare const value: AUser | BUser;`,
+  );
+  const type = sf.getVariableDeclarationOrThrow('value').getType();
+
+  const result = mapType(type);
+
+  expect(result.schema).toEqual({
+    oneOf: [{ $ref: '#/components/schemas/User' }, { $ref: '#/components/schemas/User2' }],
+  });
+  expect(result.components.User).toEqual({
+    type: 'object',
+    properties: { a: { type: 'string' } },
+    required: ['a'],
+  });
+  expect(result.components.User2).toEqual({
+    type: 'object',
+    properties: { b: { type: 'number' } },
+    required: ['b'],
+  });
+});
