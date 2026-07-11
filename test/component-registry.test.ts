@@ -1,7 +1,6 @@
 import { expect, test, vi } from 'vitest';
 import { createComponentRegistry } from '../src/component-registry.js';
-import { createProjectWithFiles } from './support/project.js';
-import { typesOfDeclarations } from './support/types.js';
+import { typesOfDeclarations, typesOfDeclarationsIn } from './support/types.js';
 
 test('resolveRef assigns a stable name and only computes the schema once', () => {
   const registry = createComponentRegistry();
@@ -22,17 +21,18 @@ test('resolveRef assigns a stable name and only computes the schema once', () =>
 
 test('resolveRef disambiguates and warns when two distinct types share a base name', () => {
   const registry = createComponentRegistry();
-  const project = createProjectWithFiles({
-    '/public.ts': `export interface User { a: string }`,
-    '/admin.ts': `export interface User { b: number }`,
-    '/t.ts': `import type { User as AUser } from './public';
+  const [aType, bType] = typesOfDeclarationsIn(
+    {
+      '/public.ts': `export interface User { a: string }`,
+      '/admin.ts': `export interface User { b: number }`,
+      '/t.ts': `import type { User as AUser } from './public';
      import type { User as BUser } from './admin';
      declare const a: AUser;
      declare const b: BUser;`,
-  });
-  const sf = project.getSourceFileOrThrow('/t.ts');
-  const aType = sf.getVariableDeclarationOrThrow('a').getType();
-  const bType = sf.getVariableDeclarationOrThrow('b').getType();
+    },
+    '/t.ts',
+    ['a', 'b'],
+  );
   const warn = vi.spyOn(console, 'warn').mockImplementation(() => undefined);
 
   const aRef = registry.resolveRef('User', aType, () => ({ type: 'object', properties: { a: {} } }));

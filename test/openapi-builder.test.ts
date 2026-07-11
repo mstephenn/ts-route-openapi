@@ -2,7 +2,8 @@ import { expect, test, vi } from 'vitest';
 import { buildOpenApi } from '../src/openapi-builder.js';
 import { extractTypes } from '../src/type-extractor.js';
 import { scanNestRoutes } from '../src/nest-scanner.js';
-import { createProjectWithFiles, createProjectWithSource, scanResolvedRoutes } from './support/project.js';
+import { createProjectWithSource, scanResolvedRoutes } from './support/project.js';
+import { typesOfDeclarationsIn } from './support/types.js';
 
 function inputsFrom(code: string) {
   return scanResolvedRoutes(createProjectWithSource(code)).map((route) => ({
@@ -157,17 +158,18 @@ test('drops default security for Nest methods with the configured public decorat
 });
 
 test('keeps same-named components distinct across route inputs', () => {
-  const project = createProjectWithFiles({
-    '/public.ts': `export interface User { a: string }`,
-    '/admin.ts': `export interface User { b: number }`,
-    '/types.ts': `import type { User as PublicUser } from './public';
+  const [aType, bType] = typesOfDeclarationsIn(
+    {
+      '/public.ts': `export interface User { a: string }`,
+      '/admin.ts': `export interface User { b: number }`,
+      '/types.ts': `import type { User as PublicUser } from './public';
      import type { User as AdminUser } from './admin';
      declare const a: PublicUser;
      declare const b: AdminUser;`,
-  });
-  const sf = project.getSourceFileOrThrow('/types.ts');
-  const aType = sf.getVariableDeclarationOrThrow('a').getType();
-  const bType = sf.getVariableDeclarationOrThrow('b').getType();
+    },
+    '/types.ts',
+    ['a', 'b'],
+  );
 
   const doc = buildOpenApi([
     {

@@ -1,7 +1,6 @@
 import { expect, test, vi } from 'vitest';
 import { mapType } from '../src/schema-mapper.js';
-import { createProjectWithFiles } from './support/project.js';
-import { typeOfAnnotation as typeOf, typesOfDeclarations } from './support/types.js';
+import { typeOfAnnotation as typeOf, typesOfDeclarations, typesOfDeclarationsIn } from './support/types.js';
 
 test('maps primitives and arrays', () => {
   expect(mapType(typeOf('string')).schema).toEqual({ type: 'string' });
@@ -151,11 +150,14 @@ test('aliases to unions keep their enum mapping (not hoisted)', () => {
 });
 
 test('does not blow the stack on recursive library types (inlined, cycle-truncated)', () => {
-  const project = createProjectWithFiles({
-    '/node_modules/somelib/index.d.ts': `export interface Chain { next: Chain; label: string }`,
-    '/t.ts': `import type { Chain } from 'somelib'; declare const value: Chain;`,
-  });
-  const type = project.getSourceFileOrThrow('/t.ts').getVariableDeclarationOrThrow('value').getType();
+  const [type] = typesOfDeclarationsIn(
+    {
+      '/node_modules/somelib/index.d.ts': `export interface Chain { next: Chain; label: string }`,
+      '/t.ts': `import type { Chain } from 'somelib'; declare const value: Chain;`,
+    },
+    '/t.ts',
+    ['value'],
+  );
 
   const result = mapType(type);
 
@@ -200,14 +202,17 @@ test('discriminated object unions hoist members and reference them in oneOf', ()
 });
 
 test('disambiguates distinct project types that share a component name', () => {
-  const project = createProjectWithFiles({
-    '/public.ts': `export interface User { a: string }`,
-    '/admin.ts': `export interface User { b: number }`,
-    '/t.ts': `import type { User as AUser } from './public';
+  const [type] = typesOfDeclarationsIn(
+    {
+      '/public.ts': `export interface User { a: string }`,
+      '/admin.ts': `export interface User { b: number }`,
+      '/t.ts': `import type { User as AUser } from './public';
      import type { User as BUser } from './admin';
      declare const value: AUser | BUser;`,
-  });
-  const type = project.getSourceFileOrThrow('/t.ts').getVariableDeclarationOrThrow('value').getType();
+    },
+    '/t.ts',
+    ['value'],
+  );
   const warn = vi.spyOn(console, 'warn').mockImplementation(() => undefined);
 
   const result = mapType(type);
@@ -232,14 +237,17 @@ test('disambiguates distinct project types that share a component name', () => {
 });
 
 test('dedupes same-named project types with identical schemas', () => {
-  const project = createProjectWithFiles({
-    '/public.ts': `export interface User { id: string }`,
-    '/admin.ts': `export interface User { id: string }`,
-    '/t.ts': `import type { User as PublicUser } from './public';
+  const [type] = typesOfDeclarationsIn(
+    {
+      '/public.ts': `export interface User { id: string }`,
+      '/admin.ts': `export interface User { id: string }`,
+      '/t.ts': `import type { User as PublicUser } from './public';
      import type { User as AdminUser } from './admin';
      declare const value: PublicUser | AdminUser;`,
-  });
-  const type = project.getSourceFileOrThrow('/t.ts').getVariableDeclarationOrThrow('value').getType();
+    },
+    '/t.ts',
+    ['value'],
+  );
   const warn = vi.spyOn(console, 'warn').mockImplementation(() => undefined);
 
   const result = mapType(type);
@@ -259,14 +267,17 @@ test('dedupes same-named project types with identical schemas', () => {
 });
 
 test('dedupes same-named recursive project types with identical schemas', () => {
-  const project = createProjectWithFiles({
-    '/public.ts': `export interface Node { id: string; next?: Node }`,
-    '/admin.ts': `export interface Node { id: string; next?: Node }`,
-    '/t.ts': `import type { Node as PublicNode } from './public';
+  const [type] = typesOfDeclarationsIn(
+    {
+      '/public.ts': `export interface Node { id: string; next?: Node }`,
+      '/admin.ts': `export interface Node { id: string; next?: Node }`,
+      '/t.ts': `import type { Node as PublicNode } from './public';
      import type { Node as AdminNode } from './admin';
      declare const value: PublicNode | AdminNode;`,
-  });
-  const type = project.getSourceFileOrThrow('/t.ts').getVariableDeclarationOrThrow('value').getType();
+    },
+    '/t.ts',
+    ['value'],
+  );
   const warn = vi.spyOn(console, 'warn').mockImplementation(() => undefined);
 
   const result = mapType(type);
