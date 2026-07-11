@@ -138,6 +138,12 @@ test('drops default security for Nest methods with the configured public decorat
         health(): { ok: boolean } {
           return { ok: true };
         }
+
+        @Public()
+        @Get('admin')
+        admin(): { ok: boolean } {
+          return { ok: true };
+        }
       }
     `,
   );
@@ -146,11 +152,13 @@ test('drops default security for Nest methods with the configured public decorat
     config: {
       securitySchemes: { bearerAuth: { type: 'http', scheme: 'bearer' } },
       security: [{ bearerAuth: [] }],
+      securityOverrides: [{ method: 'GET', path: '/status/admin', security: [{ bearerAuth: [] }] }],
       publicDecorator: 'Public',
     },
   }) as any;
 
   expect(doc.paths['/status/health'].get.security).toEqual([]);
+  expect(doc.paths['/status/admin'].get.security).toEqual([{ bearerAuth: [] }]);
 });
 
 test('keeps same-named components distinct across route inputs', () => {

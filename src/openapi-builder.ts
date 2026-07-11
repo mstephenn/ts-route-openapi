@@ -105,13 +105,14 @@ function operationSecurity(
   config: GeneratorConfig | undefined,
 ): SecurityRequirement[] | undefined {
   if (!config) return undefined;
-  if (isPublicRoute(route, config.publicDecorator)) return [];
 
   const override = config.securityOverrides?.find((entry) => {
     const methodMatches = !entry.method || entry.method.toLowerCase() === route.verb;
     return methodMatches && globMatches(entry.path, route.path);
   });
   if (override) return override.security;
+
+  if (isPublicRoute(route, config.publicDecorator)) return [];
 
   return config.security;
 }
