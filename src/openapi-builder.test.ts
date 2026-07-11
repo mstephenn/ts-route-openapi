@@ -170,6 +170,29 @@ test('maps Fastify route schema object literals into body, querystring and param
   });
 });
 
+test('maps Fastify route Zod schemas in route options', () => {
+  const doc = buildOpenApi(
+    inputsFrom(`
+      declare const app: any;
+      declare const z: any;
+      app.post('/orders', {
+        schema: {
+          body: z.object({ sku: z.string(), count: z.number().nullable() }),
+        },
+      }, () => ({ ok: true }));
+    `),
+  ) as any;
+
+  expect(doc.paths['/orders'].post.requestBody.content['application/json'].schema).toEqual({
+    type: 'object',
+    properties: {
+      sku: { type: 'string' },
+      count: { type: 'number', nullable: true },
+    },
+    required: ['sku', 'count'],
+  });
+});
+
 test('unsupported Zod constructs emit an empty schema with a warning', () => {
   const warn = vi.spyOn(console, 'warn').mockImplementation(() => undefined);
 

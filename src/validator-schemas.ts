@@ -48,8 +48,8 @@ function honoValidatorSchema(expression: Expression): ValidatorSchemas | undefin
   const target = targetArg.getLiteralValue();
 
   if (target === 'json') return { bodySchema: schema };
-  if (target === 'query') return { query: schemaToParams(schema, false) };
-  if (target === 'param') return { pathParams: schemaToParams(schema, true) };
+  if (target === 'query') return { query: schemaToParams(schema) };
+  if (target === 'param') return { pathParams: schemaToParams(schema) };
   return undefined;
 }
 
@@ -64,8 +64,8 @@ function fastifyRouteOptionSchemas(expression: Expression): ValidatorSchemas | u
   const params = propertyExpression(schemaExpression, 'params');
 
   if (body) result.bodySchema = schemaExpressionToOpenApi(body);
-  if (query) result.query = schemaToParams(schemaExpressionToOpenApi(query), false);
-  if (params) result.pathParams = schemaToParams(schemaExpressionToOpenApi(params), true);
+  if (query) result.query = schemaToParams(schemaExpressionToOpenApi(query));
+  if (params) result.pathParams = schemaToParams(schemaExpressionToOpenApi(params));
 
   return result;
 }
@@ -202,14 +202,12 @@ function zodUnion(arg: MorphNode | undefined): Schema {
   return { oneOf: schemas };
 }
 
-function schemaToParams(schema: Schema, requiredByLocation: boolean): ParamType[] {
+function schemaToParams(schema: Schema): ParamType[] {
   const properties = isSchema(schema.properties) ? schema.properties : {};
-  const required = new Set(Array.isArray(schema.required) ? schema.required : []);
 
   return Object.entries(properties).map(([name, propertySchema]) => ({
     name,
     schema: isSchema(propertySchema) ? propertySchema : {},
-    ...(requiredByLocation || required.has(name) ? {} : {}),
   }));
 }
 
