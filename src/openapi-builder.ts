@@ -1,3 +1,4 @@
+import { STATUS_CODES } from 'node:http';
 import { mapType } from './schema-mapper.js';
 import type { ResolvedRoute, RouteTypes } from './types.js';
 
@@ -13,19 +14,8 @@ export interface ApiInfo {
 
 type Json = Record<string, unknown>;
 
-const REASON_PHRASES: Record<number, string> = {
-  200: 'OK',
-  201: 'Created',
-  202: 'Accepted',
-  204: 'No Content',
-  400: 'Bad Request',
-  401: 'Unauthorized',
-  403: 'Forbidden',
-  404: 'Not Found',
-  409: 'Conflict',
-  422: 'Unprocessable Entity',
-  500: 'Internal Server Error',
-};
+/** Statuses that must not carry a response body per HTTP semantics. */
+const BODILESS_STATUSES = new Set([204, 205, 304]);
 
 /** Convert `/orgs/:id/users` to the OpenAPI `/orgs/{id}/users` template form. */
 function templatePath(path: string): string {
@@ -72,8 +62,8 @@ export function buildOpenApi(
     const responses: Json = {};
     const entries = types.responses ?? [{ status: 200, type: types.response }];
     for (const entry of entries) {
-      const response: Json = { description: REASON_PHRASES[entry.status] ?? 'Response' };
-      if (entry.type) {
+      const response: Json = { description: STATUS_CODES[entry.status] ?? 'Response' };
+      if (entry.type && !BODILESS_STATUSES.has(entry.status)) {
         const { schema, components: c } = mapType(entry.type);
         mergeComponents(c);
         response.content = { 'application/json': { schema } };

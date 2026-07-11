@@ -93,3 +93,33 @@ test('fastify: a 2xx reply.code claims the payload type', () => {
 
   expect(types.responses?.map((r) => [r.status, r.type?.getText()])).toEqual([[201, 'Order']]);
 });
+
+test('express: enum/const status arguments resolve via the type checker', () => {
+  const [route] = routesFrom(`
+    ${EXPRESS_DECLS}
+    const NOT_FOUND = 404;
+    enum HttpStatus { CREATED = 201 }
+    declare const app: any;
+    app.post('/things', (req: Request, res: Response<{ ok: boolean }>) => {
+      if (Math.random() > 1) return void res.status(NOT_FOUND).end();
+      res.status(HttpStatus.CREATED).json({ ok: true });
+    });
+  `);
+  const types = extractTypes(route);
+
+  expect(types.responses?.map((r) => r.status)).toEqual([201, 404]);
+});
+
+test('express: a shadowed res in a nested closure is not misattributed', () => {
+  const [route] = routesFrom(`
+    ${EXPRESS_DECLS}
+    declare const app: any;
+    app.get('/x', (req: Request, res: Response<{ ok: boolean }>) => {
+      [1].forEach((res: any) => res.status(500).json({ boom: true }));
+      res.json({ ok: true });
+    });
+  `);
+  const types = extractTypes(route);
+
+  expect(types.responses?.map((r) => r.status)).toEqual([200]);
+});

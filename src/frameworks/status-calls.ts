@@ -1,5 +1,21 @@
-import { Node, type Type } from 'ts-morph';
+import { Node, type ParameterDeclaration, type Type } from 'ts-morph';
 import type { ResponseType, RouteHandler } from '../types.js';
+
+/**
+ * Resolve a status-code argument to its number via the type checker — covers
+ * numeric literals, const references, and enum members (e.g. HttpStatus.CREATED).
+ */
+export function literalStatus(node: Node | undefined): number | undefined {
+  if (!node) return undefined;
+  const literal = node.getType().getLiteralValue();
+  return typeof literal === 'number' ? literal : undefined;
+}
+
+/** True when the expression resolves to the given parameter declaration (shadow-safe). */
+function refersToParam(receiver: Node, param: ParameterDeclaration): boolean {
+  if (!Node.isIdentifier(receiver)) return false;
+  return receiver.getSymbol()?.getDeclarations()[0] === param;
+}
 
 /**
  * Scan an Express-style handler body for response chains on `res`:
@@ -9,7 +25,7 @@ import type { ResponseType, RouteHandler } from '../types.js';
  */
 export function expressStatusResponses(
   handler: RouteHandler,
-  resName: string,
+  resParam: ParameterDeclaration,
   fallbackType: Type | undefined,
 ): ResponseType[] {
   const found = new Map<number, Type | undefined>();
@@ -27,16 +43,16 @@ export function expressStatusResponses(
       // res.status(N).json(...)
       const inner = receiver.getExpression();
       if (!Node.isPropertyAccessExpression(inner) || inner.getName() !== 'status') return;
-      if (inner.getExpression().getText() !== resName) return;
-      const arg = receiver.getArguments()[0];
-      if (!arg || !Node.isNumericLiteral(arg)) return;
-      status = Number(arg.getLiteralValue());
-    } else if (receiver.getText() !== resName) {
+      if (!refersToParam(inner.getExpression(), resParam)) return;
+      const resolved = literalStatus(receiver.getArguments()[0]);
+      if (resolved === undefined) return;
+      status = resolved;
+    } else if (!refersToParam(receiver, resParam)) {
       return;
     }
 
-    const payload = method === 'end' ? undefined : node.getArguments()[0]?.getType();
-    if (!found.has(status)) found.set(status, payload);
+    if (found.has(status)) return;
+    found.set(status, method === 'end' ? undefined : node.getArguments()[0]?.getType());
   });
 
   if (found.size === 0) return [];
@@ -54,20 +70,21 @@ export function expressStatusResponses(
  */
 export function fastifyStatusResponses(
   handler: RouteHandler,
-  replyName: string | undefined,
+  replyParam: ParameterDeclaration | undefined,
   payloadType: Type | undefined,
 ): ResponseType[] {
   const codes = new Set<number>();
 
-  if (replyName) {
+  if (replyParam) {
     handler.forEachDescendant((node) => {
       if (!Node.isCallExpression(node)) return;
       const callee = node.getExpression();
       if (!Node.isPropertyAccessExpression(callee)) return;
-      if (callee.getName() !== 'code' && callee.getName() !== 'status') return;
-      if (callee.getExpression().getText() !== replyName) return;
-      const arg = node.getArguments()[0];
-      if (arg && Node.isNumericLiteral(arg)) codes.add(Number(arg.getLiteralValue()));
+      const method = callee.getName();
+      if (method !== 'code' && method !== 'status') return;
+      if (!refersToParam(callee.getExpression(), replyParam)) return;
+      const resolved = literalStatus(node.getArguments()[0]);
+      if (resolved !== undefined) codes.add(resolved);
     });
   }
 

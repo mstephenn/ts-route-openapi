@@ -1,5 +1,6 @@
 import { Node, type Decorator, type MethodDeclaration, type Project } from 'ts-morph';
 import { objectParams, unwrapPromise, usableObject, usableResponse } from './frameworks/shared.js';
+import { literalStatus } from './frameworks/status-calls.js';
 import type { HttpVerb, ParamType, ResolvedRoute, RouteTypes } from './types.js';
 
 const VERB_DECORATORS: Record<string, HttpVerb> = {
@@ -64,11 +65,11 @@ function joinPaths(base: string, sub: string): string {
   return `/${joined}`;
 }
 
-/** Nest's status: @HttpCode(N) wins; otherwise POST defaults to 201, everything else 200. */
+/** Nest's status: @HttpCode(N) wins (literal, const, or HttpStatus enum member); otherwise POST defaults to 201, everything else 200. */
 function nestStatus(method: MethodDeclaration, verb: HttpVerb): number {
   const decorator = method.getDecorator('HttpCode');
-  const arg = decorator?.getArguments()[0];
-  if (arg && Node.isNumericLiteral(arg)) return Number(arg.getLiteralValue());
+  const status = literalStatus(decorator?.getArguments()[0]);
+  if (status !== undefined) return status;
   return verb === 'post' ? 201 : 200;
 }
 

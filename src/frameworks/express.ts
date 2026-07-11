@@ -23,9 +23,7 @@ export function extractExpress(
       : undefined;
 
   const response = usableResponse(resArg) ?? usableResponse(args[1]);
-  const responses = res
-    ? expressStatusResponses(route.method, res.getName(), response)
-    : [];
+  const responses = res ? expressStatusResponses(route.method, res, response) : [];
 
   return {
     pathParams: objectParams(args[0], req) ?? tokenParams(route),

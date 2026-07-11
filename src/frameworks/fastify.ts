@@ -29,7 +29,7 @@ export function extractFastify(
   const response =
     usableResponse(unwrapPromise(route.method.getReturnType())) ??
     usableResponse(member('Reply'));
-  const responses = fastifyStatusResponses(route.method, params[1]?.getName(), response);
+  const responses = fastifyStatusResponses(route.method, params[1], response);
 
   return {
     pathParams: objectParams(member('Params'), req) ?? tokenParams(route),
