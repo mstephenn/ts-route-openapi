@@ -1,0 +1,21 @@
+openapi: 3.0.3
+info:
+  title: Orders API (Koa)
+  version: 1.0.0
+paths:
+  /orders/{id}:
+    get:
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: OK
+  /orders:
+    post:
+      responses:
+        "200":
+          description: OK

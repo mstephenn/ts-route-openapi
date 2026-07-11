@@ -33,15 +33,19 @@ export function buildOpenApi(
     const operation: Json = {};
     const parameters: Json[] = [];
 
-    for (const p of types.pathParams) {
+    // A param without static type information documents as a string.
+    const paramSchema = (p: { type?: Parameters<typeof mapType>[0] }): Json => {
+      if (!p.type) return { type: 'string' };
       const { schema, components: c } = mapType(p.type);
       mergeComponents(c);
-      parameters.push({ name: p.name, in: 'path', required: true, schema });
+      return schema;
+    };
+
+    for (const p of types.pathParams) {
+      parameters.push({ name: p.name, in: 'path', required: true, schema: paramSchema(p) });
     }
     for (const q of types.query) {
-      const { schema, components: c } = mapType(q.type);
-      mergeComponents(c);
-      parameters.push({ name: q.name, in: 'query', required: false, schema });
+      parameters.push({ name: q.name, in: 'query', required: false, schema: paramSchema(q) });
     }
     if (parameters.length > 0) operation.parameters = parameters;
 

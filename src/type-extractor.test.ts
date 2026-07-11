@@ -25,7 +25,7 @@ test('classifies path params, body, query and unwraps Promise response', () => {
   );
 
   expect(types.pathParams.map((p) => p.name)).toEqual(['id']);
-  expect(types.pathParams[0].type.getText()).toBe('string');
+  expect(types.pathParams[0].type?.getText()).toBe('string');
   expect(types.body?.getText()).toBe('CreateInput');
   expect(types.query.map((q) => q.name)).toEqual(['verbose']);
   expect(types.response?.getText()).toBe('{ ok: boolean; }');

@@ -1,0 +1,65 @@
+openapi: 3.0.3
+info:
+  title: Orders API (Hono)
+  version: 1.0.0
+paths:
+  /orders/{id}:
+    get:
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  id:
+                    type: string
+                  productId:
+                    type: string
+                  quantity:
+                    type: number
+                  status:
+                    type: string
+                    enum:
+                      - pending
+                      - shipped
+                      - delivered
+                required:
+                  - id
+                  - productId
+                  - quantity
+                  - status
+  /orders:
+    post:
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  id:
+                    type: string
+                  productId:
+                    type: string
+                  quantity:
+                    type: number
+                  status:
+                    type: string
+                    enum:
+                      - pending
+                      - shipped
+                      - delivered
+                required:
+                  - id
+                  - productId
+                  - quantity
+                  - status

@@ -1,4 +1,11 @@
-import type { MethodDeclaration, Node, Type } from 'ts-morph';
+import type {
+  ArrowFunction,
+  FunctionDeclaration,
+  FunctionExpression,
+  MethodDeclaration,
+  Node,
+  Type,
+} from 'ts-morph';
 
 export type HttpVerb = 'get' | 'post' | 'put' | 'patch' | 'delete';
 
@@ -9,21 +16,29 @@ export interface RouteBinding {
   handlerExpression: Node;
 }
 
-/** A binding resolved to the controller method that implements it. */
+/** Any function-like declaration a route can bind to. */
+export type RouteHandler =
+  | MethodDeclaration
+  | FunctionDeclaration
+  | ArrowFunction
+  | FunctionExpression;
+
+/** A binding resolved to the handler that implements it. */
 export interface ResolvedRoute {
   verb: HttpVerb;
   path: string;
   controllerName: string;
   handlerName: string;
-  method: MethodDeclaration;
+  method: RouteHandler;
 }
 
 export interface ParamType {
   name: string;
-  type: Type;
+  /** Omitted means "no static type information" — documented as a string. */
+  type?: Type;
 }
 
-/** Types extracted from a resolved route's method signature. */
+/** Types extracted from a resolved route's handler signature. */
 export interface RouteTypes {
   pathParams: ParamType[];
   query: ParamType[];

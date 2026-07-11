@@ -93,18 +93,40 @@ const doc = generate('path/to/tsconfig.json', { title: 'My API', version: '1.0.0
 
 ## How it works
 
-The tool loads your project via its `tsconfig.json` and walks the source for
-**route registration call-sites** — any call of the shape
-`something.<verb>('/path', Handler.method)` where `<verb>` is one of
-`get`, `post`, `put`, `patch`, `delete` and the first argument is a string
-literal. It follows the handler reference to the controller method, then uses
-the **TypeScript type checker** to extract parameter and return types. The
-route registrations in your bootstrap are the single source of truth — nothing
-to keep in sync.
+The tool loads your project via its `tsconfig.json` and discovers routes two
+ways:
 
-### Parameter classification convention
+1. **Registration call-sites** — any call of the shape
+   `something.<verb>('/path', handler)` where `<verb>` is one of `get`,
+   `post`, `put`, `patch`, `delete` and the first argument is a string
+   literal. The handler can be a controller method reference
+   (`UsersController.getById`), an inline arrow function, or an identifier
+   pointing at a function.
+2. **NestJS decorators** — `@Controller('base')` classes with
+   `@Get/@Post/@Put/@Patch/@Delete` methods.
 
-For each handler method parameter, in declaration order:
+It then uses the **TypeScript type checker** on the handler to extract
+parameter and return types. Your registrations are the single source of
+truth — nothing to keep in sync.
+
+### Framework support
+
+| Framework | Types read from |
+| --- | --- |
+| **Express** | `Request<Params, ResBody, ReqBody, Query>` and `Response<T>` generics |
+| **Fastify** | `FastifyRequest<{ Params; Body; Querystring; Reply }>` route generic + handler return type |
+| **NestJS** | `@Param('x')/@Query('x')/@Body()` decorated, typed method params + return type |
+| **Hono** | `TypedResponse<T>` from `c.json(...)` return types; path params from `:tokens` |
+| **Koa (+ @koa/router)** | paths and `:token` params only (`ctx` carries no static route types) |
+| **Anything else** | plain-typed handlers via the classification convention below; unknown framework objects fall back to `:token` string params |
+
+A registered route always makes it into the spec: when no types are
+recognizable the tool documents the path and its `:token` params as strings
+rather than dropping the route.
+
+### Parameter classification convention (plain typed handlers)
+
+For each handler parameter, in declaration order:
 
 1. **Path params** — any parameter whose name matches a `:token` in the
    route path (e.g. `id` in `/users/:id`) is classified as a path parameter.
@@ -130,18 +152,16 @@ unwrapping `Promise<T>` to `T` when present.
 
 ## Examples
 
-Runnable **Express**, **Fastify**, and framework-agnostic examples — each with
-its generated `openapi.yaml` committed — live in [`examples/`](./examples).
-They demonstrate the typed-controller + adapter pattern the tool is designed
-for.
+Runnable, idiomatic **Express**, **Fastify**, **NestJS**, **Hono**, **Koa**,
+and framework-free examples — each with its generated `openapi.yaml`
+committed — live in [`examples/`](./examples). No adapters or code changes:
+install, run the CLI, get the spec.
 
 ## Limitations (MVP scope)
 
-- **Idiomatic `(req, res)` handlers are not supported**: handlers must be
-  plain typed methods (`getById(id: string): Order`). Framework
-  request/response objects carry no extractable route types — register typed
-  controllers through a thin adapter instead (see [`examples/`](./examples)).
-
+- **Validator-middleware types are not read**: schemas defined in Zod/TypeBox
+  validators (common in Hono and Fastify setups) are not yet consulted — only
+  signature-level types are.
 - **Single response**: only a `200` response is emitted; no error responses,
   no auth, no other status codes.
 - **Type aliases are inlined, not hoisted**: only `interface`/`class`

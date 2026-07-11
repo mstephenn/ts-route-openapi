@@ -1,6 +1,6 @@
 openapi: 3.0.3
 info:
-  title: Orders API (Express)
+  title: Orders API (NestJS)
   version: 1.0.0
 paths:
   /orders/{id}:
@@ -25,7 +25,7 @@ paths:
           in: query
           required: false
           schema:
-            type: string
+            type: number
       responses:
         "200":
           description: OK
@@ -40,7 +40,7 @@ paths:
         content:
           application/json:
             schema:
-              $ref: "#/components/schemas/CreateOrderInput"
+              $ref: "#/components/schemas/CreateOrderDto"
       responses:
         "200":
           description: OK
@@ -65,16 +65,12 @@ components:
             - pending
             - shipped
             - delivered
-        createdAt:
-          type: string
-          format: date-time
       required:
         - id
         - productId
         - quantity
         - status
-        - createdAt
-    CreateOrderInput:
+    CreateOrderDto:
       type: object
       properties:
         productId:
@@ -86,3 +82,4 @@ components:
       required:
         - productId
         - quantity
+        - note
