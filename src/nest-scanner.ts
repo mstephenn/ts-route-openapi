@@ -43,6 +43,7 @@ export function scanNestRoutes(project: Project): NestRoute[] {
               controllerName: cls.getName() ?? '(anonymous)',
               handlerName: method.getName(),
               method,
+              middlewareExpressions: [],
             },
             types: extractNestTypes(method, verb),
           });

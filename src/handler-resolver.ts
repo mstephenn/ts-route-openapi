@@ -9,7 +9,11 @@ import type { ResolvedRoute, RouteBinding } from './types.js';
  */
 export function resolveHandler(binding: RouteBinding): ResolvedRoute | null {
   const expr = binding.handlerExpression;
-  const base = { verb: binding.verb, path: binding.path };
+  const base = {
+    verb: binding.verb,
+    path: binding.path,
+    middlewareExpressions: binding.middlewareExpressions,
+  };
 
   if (Node.isArrowFunction(expr) || Node.isFunctionExpression(expr)) {
     return {

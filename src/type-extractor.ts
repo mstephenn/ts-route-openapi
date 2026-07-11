@@ -3,6 +3,7 @@ import { tryFrameworkExtractors } from './frameworks/index.js';
 import { tokenParams } from './frameworks/shared.js';
 import { pathTokens } from './route-paths.js';
 import type { ParamType, ResolvedRoute, RouteTypes } from './types.js';
+import { extractValidatorSchemas } from './validator-schemas.js';
 
 /**
  * Extract a route's request/response types from its handler signature.
@@ -20,12 +21,13 @@ import type { ParamType, ResolvedRoute, RouteTypes } from './types.js';
  */
 export function extractTypes(route: ResolvedRoute): RouteTypes {
   const params = route.method.getParameters();
+  const validators = extractValidatorSchemas(route.middlewareExpressions);
 
   const framework = tryFrameworkExtractors(route, params);
-  if (framework) return framework;
+  if (framework) return mergeValidatorTypes(framework, validators);
 
   if (isFrameworkLike(params[0])) {
-    return { pathParams: tokenParams(route), query: [] };
+    return mergeValidatorTypes({ pathParams: tokenParams(route), query: [] }, validators);
   }
 
   const tokens = pathTokens(route.path);
@@ -59,7 +61,19 @@ export function extractTypes(route: ResolvedRoute): RouteTypes {
     if (args.length === 1) response = args[0];
   }
 
-  return { pathParams, query, body, response };
+  return mergeValidatorTypes({ pathParams, query, body, response }, validators);
+}
+
+function mergeValidatorTypes(
+  types: RouteTypes,
+  validators: ReturnType<typeof extractValidatorSchemas>,
+): RouteTypes {
+  return {
+    ...types,
+    pathParams: validators.pathParams ?? types.pathParams,
+    query: validators.query ?? types.query,
+    bodySchema: validators.bodySchema ?? types.bodySchema,
+  };
 }
 
 /** True when the parameter's type is declared outside the project (a framework object). */

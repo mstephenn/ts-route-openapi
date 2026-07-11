@@ -114,9 +114,9 @@ truth — nothing to keep in sync.
 | Framework | Types read from |
 | --- | --- |
 | **Express** | `Request<Params, ResBody, ReqBody, Query>` and `Response<T>` generics |
-| **Fastify** | `FastifyRequest<{ Params; Body; Querystring; Reply }>` route generic + handler return type |
+| **Fastify** | `FastifyRequest<{ Params; Body; Querystring; Reply }>` route generic + handler return type; route `schema.body` / `schema.querystring` / `schema.params` from Zod or JSON-schema object literals |
 | **NestJS** | `@Param('x')/@Query('x')/@Body()` decorated, typed method params + return type |
-| **Hono** | `TypedResponse<T>` from `c.json(...)` return types; path params from `:tokens` |
+| **Hono** | `TypedResponse<T>` from `c.json(...)` return types; path params from `:tokens`; `zValidator('json' | 'query', schema)` for Zod request schemas |
 | **Koa (+ @koa/router)** | paths and `:token` params only (`ctx` carries no static route types) |
 | **Anything else** | plain-typed handlers via the classification convention below; unknown framework objects fall back to `:token` string params |
 
@@ -153,6 +153,10 @@ unwrapping `Promise<T>` to `T` when present.
 - Named `interface`/`class`/`type` alias declarations from your project are
   hoisted into `components.schemas` and referenced via `$ref` (recursive
   types self-reference); library/`node_modules` types are inlined.
+- Zod validator schemas in Hono and Fastify route metadata map common builders
+  (`object`, `string`, `number`, `boolean`, `array`, `enum`, `optional`,
+  `nullable`, `literal`, and literal unions). Unsupported constructs degrade to
+  `{}` with a stderr note.
 
 ## Examples
 
@@ -173,9 +177,6 @@ See [`CONTRIBUTING.md`](./CONTRIBUTING.md) for the full workflow.
 
 ## Limitations (MVP scope)
 
-- **Validator-middleware types are not read**: schemas defined in Zod/TypeBox
-  validators (common in Hono and Fastify setups) are not yet consulted — only
-  signature-level types are.
 - **Status codes are detected, not exhaustive**: `res.status(N)` /
   `reply.code(N)` / `@HttpCode(N)` produce per-status responses, but
   statuses set by middleware, error filters, or thrown exceptions are not
