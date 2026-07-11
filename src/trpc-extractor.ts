@@ -41,7 +41,7 @@ function chainSchema(call: CallExpression, method: string): Schema | undefined {
 }
 
 /** The function-like declaration a resolver node is or refers to, following a named/hoisted function reference. */
-function resolverFunction(resolver: Node): FunctionLikeDeclaration | undefined {
+export function resolverFunction(resolver: Node): FunctionLikeDeclaration | undefined {
   if (Node.isFunctionLikeDeclaration(resolver)) return resolver;
 
   if (Node.isIdentifier(resolver)) {
