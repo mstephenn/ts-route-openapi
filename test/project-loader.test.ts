@@ -2,7 +2,7 @@ import { mkdtempSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { expect, test } from 'vitest';
-import { loadProject } from './project-loader.js';
+import { loadProject } from '../src/project-loader.js';
 
 test('loadProject loads source files from a tsconfig', () => {
   const dir = mkdtempSync(join(tmpdir(), 'trotest-'));

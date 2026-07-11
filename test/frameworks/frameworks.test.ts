@@ -1,13 +1,9 @@
-import { Project } from 'ts-morph';
 import { expect, test } from 'vitest';
-import { resolveHandler } from '../handler-resolver.js';
-import { scanRoutes } from '../route-scanner.js';
-import { extractTypes } from '../type-extractor.js';
+import { extractTypes } from '../../src/type-extractor.js';
+import { createProjectWithFiles, scanResolvedRoutes } from '../support/project.js';
 
 function routesFrom(files: Record<string, string>) {
-  const project = new Project({ useInMemoryFileSystem: true });
-  for (const [path, code] of Object.entries(files)) project.createSourceFile(path, code);
-  return scanRoutes(project).map((b) => resolveHandler(b)!);
+  return scanResolvedRoutes(createProjectWithFiles(files));
 }
 
 test('express: extracts Params/ReqBody/Query/Response generics from controller methods', () => {

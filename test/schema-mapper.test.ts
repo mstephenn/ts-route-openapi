@@ -1,13 +1,6 @@
-import { Project, type Type } from 'ts-morph';
 import { expect, test, vi } from 'vitest';
-import { mapType } from './schema-mapper.js';
-
-/** Build a Type from the annotation of `declare const value: <annotation>`. */
-function typeOf(annotation: string): Type {
-  const project = new Project({ useInMemoryFileSystem: true });
-  const sf = project.createSourceFile('t.ts', `declare const value: ${annotation};`);
-  return sf.getVariableDeclarationOrThrow('value').getType();
-}
+import { mapType } from '../src/schema-mapper.js';
+import { typeOfAnnotation as typeOf, typesOfDeclarations, typesOfDeclarationsIn } from './support/types.js';
 
 test('maps primitives and arrays', () => {
   expect(mapType(typeOf('string')).schema).toEqual({ type: 'string' });
@@ -34,12 +27,10 @@ test('inlines anonymous objects with required tracking', () => {
 });
 
 test('hoists named interfaces into components and references them', () => {
-  const project = new Project({ useInMemoryFileSystem: true });
-  const sf = project.createSourceFile(
-    't.ts',
+  const [type] = typesOfDeclarations(
     `interface User { id: string } declare const value: User;`,
+    ['value'],
   );
-  const type = sf.getVariableDeclarationOrThrow('value').getType();
 
   const result = mapType(type);
 
@@ -52,9 +43,7 @@ test('hoists named interfaces into components and references them', () => {
 });
 
 test('adds property descriptions from JSDoc when enabled', () => {
-  const project = new Project({ useInMemoryFileSystem: true });
-  const sf = project.createSourceFile(
-    't.ts',
+  const [type] = typesOfDeclarations(
     `interface User {
        /**
         * User display name.
@@ -63,8 +52,8 @@ test('adds property descriptions from JSDoc when enabled', () => {
        name: string
      }
      declare const value: User;`,
+    ['value'],
   );
-  const type = sf.getVariableDeclarationOrThrow('value').getType();
 
   const result = mapType(type, { descriptions: true });
 
@@ -117,12 +106,10 @@ test('collapses an optional boolean property to a boolean schema', () => {
 });
 
 test('recursive project-source aliases hoist and self-reference via $ref', () => {
-  const project = new Project({ useInMemoryFileSystem: true });
-  const sf = project.createSourceFile(
-    't.ts',
+  const [type] = typesOfDeclarations(
     `type LinkedNode = { value: string; next: LinkedNode }; declare const value: LinkedNode;`,
+    ['value'],
   );
-  const type = sf.getVariableDeclarationOrThrow('value').getType();
 
   const result = mapType(type);
 
@@ -138,12 +125,10 @@ test('recursive project-source aliases hoist and self-reference via $ref', () =>
 });
 
 test('hoists named type aliases like interfaces', () => {
-  const project = new Project({ useInMemoryFileSystem: true });
-  const sf = project.createSourceFile(
-    't.ts',
+  const [type] = typesOfDeclarations(
     `type User = { id: string; name?: string }; declare const value: User;`,
+    ['value'],
   );
-  const type = sf.getVariableDeclarationOrThrow('value').getType();
 
   const result = mapType(type);
 
@@ -156,27 +141,23 @@ test('hoists named type aliases like interfaces', () => {
 });
 
 test('aliases to unions keep their enum mapping (not hoisted)', () => {
-  const project = new Project({ useInMemoryFileSystem: true });
-  const sf = project.createSourceFile(
-    't.ts',
+  const [type] = typesOfDeclarations(
     `type Status = 'a' | 'b'; declare const value: Status;`,
+    ['value'],
   );
-  const type = sf.getVariableDeclarationOrThrow('value').getType();
 
   expect(mapType(type).schema).toEqual({ type: 'string', enum: ['a', 'b'] });
 });
 
 test('does not blow the stack on recursive library types (inlined, cycle-truncated)', () => {
-  const project = new Project({ useInMemoryFileSystem: true });
-  project.createSourceFile(
-    '/node_modules/somelib/index.d.ts',
-    `export interface Chain { next: Chain; label: string }`,
-  );
-  const sf = project.createSourceFile(
+  const [type] = typesOfDeclarationsIn(
+    {
+      '/node_modules/somelib/index.d.ts': `export interface Chain { next: Chain; label: string }`,
+      '/t.ts': `import type { Chain } from 'somelib'; declare const value: Chain;`,
+    },
     '/t.ts',
-    `import type { Chain } from 'somelib'; declare const value: Chain;`,
+    ['value'],
   );
-  const type = sf.getVariableDeclarationOrThrow('value').getType();
 
   const result = mapType(type);
 
@@ -202,14 +183,12 @@ test('mixed multi-type unions map to oneOf', () => {
 });
 
 test('discriminated object unions hoist members and reference them in oneOf', () => {
-  const project = new Project({ useInMemoryFileSystem: true });
-  const sf = project.createSourceFile(
-    't.ts',
+  const [type] = typesOfDeclarations(
     `interface Cat { kind: 'cat'; lives: number }
      interface Dog { kind: 'dog'; good: boolean }
      declare const value: Cat | Dog;`,
+    ['value'],
   );
-  const type = sf.getVariableDeclarationOrThrow('value').getType();
 
   const result = mapType(type);
 
@@ -223,16 +202,17 @@ test('discriminated object unions hoist members and reference them in oneOf', ()
 });
 
 test('disambiguates distinct project types that share a component name', () => {
-  const project = new Project({ useInMemoryFileSystem: true });
-  project.createSourceFile('/public.ts', `export interface User { a: string }`);
-  project.createSourceFile('/admin.ts', `export interface User { b: number }`);
-  const sf = project.createSourceFile(
-    '/t.ts',
-    `import type { User as AUser } from './public';
+  const [type] = typesOfDeclarationsIn(
+    {
+      '/public.ts': `export interface User { a: string }`,
+      '/admin.ts': `export interface User { b: number }`,
+      '/t.ts': `import type { User as AUser } from './public';
      import type { User as BUser } from './admin';
      declare const value: AUser | BUser;`,
+    },
+    '/t.ts',
+    ['value'],
   );
-  const type = sf.getVariableDeclarationOrThrow('value').getType();
   const warn = vi.spyOn(console, 'warn').mockImplementation(() => undefined);
 
   const result = mapType(type);
@@ -257,16 +237,17 @@ test('disambiguates distinct project types that share a component name', () => {
 });
 
 test('dedupes same-named project types with identical schemas', () => {
-  const project = new Project({ useInMemoryFileSystem: true });
-  project.createSourceFile('/public.ts', `export interface User { id: string }`);
-  project.createSourceFile('/admin.ts', `export interface User { id: string }`);
-  const sf = project.createSourceFile(
-    '/t.ts',
-    `import type { User as PublicUser } from './public';
+  const [type] = typesOfDeclarationsIn(
+    {
+      '/public.ts': `export interface User { id: string }`,
+      '/admin.ts': `export interface User { id: string }`,
+      '/t.ts': `import type { User as PublicUser } from './public';
      import type { User as AdminUser } from './admin';
      declare const value: PublicUser | AdminUser;`,
+    },
+    '/t.ts',
+    ['value'],
   );
-  const type = sf.getVariableDeclarationOrThrow('value').getType();
   const warn = vi.spyOn(console, 'warn').mockImplementation(() => undefined);
 
   const result = mapType(type);
@@ -286,16 +267,17 @@ test('dedupes same-named project types with identical schemas', () => {
 });
 
 test('dedupes same-named recursive project types with identical schemas', () => {
-  const project = new Project({ useInMemoryFileSystem: true });
-  project.createSourceFile('/public.ts', `export interface Node { id: string; next?: Node }`);
-  project.createSourceFile('/admin.ts', `export interface Node { id: string; next?: Node }`);
-  const sf = project.createSourceFile(
-    '/t.ts',
-    `import type { Node as PublicNode } from './public';
+  const [type] = typesOfDeclarationsIn(
+    {
+      '/public.ts': `export interface Node { id: string; next?: Node }`,
+      '/admin.ts': `export interface Node { id: string; next?: Node }`,
+      '/t.ts': `import type { Node as PublicNode } from './public';
      import type { Node as AdminNode } from './admin';
      declare const value: PublicNode | AdminNode;`,
+    },
+    '/t.ts',
+    ['value'],
   );
-  const type = sf.getVariableDeclarationOrThrow('value').getType();
   const warn = vi.spyOn(console, 'warn').mockImplementation(() => undefined);
 
   const result = mapType(type);

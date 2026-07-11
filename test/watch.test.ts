@@ -1,5 +1,5 @@
 import { expect, test, vi } from 'vitest';
-import { createWatchSession, type WatchRunnerDeps } from './watch.js';
+import { createWatchSession, type WatchRunnerDeps } from '../src/watch.js';
 
 function fakeDeps() {
   const listeners: Array<() => void> = [];

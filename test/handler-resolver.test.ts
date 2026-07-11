@@ -1,12 +1,11 @@
-import { Node, Project } from 'ts-morph';
+import { Node } from 'ts-morph';
 import { expect, test } from 'vitest';
-import { resolveHandler } from './handler-resolver.js';
-import { scanRoutes } from './route-scanner.js';
+import { resolveHandler } from '../src/handler-resolver.js';
+import { scanRoutes } from '../src/route-scanner.js';
+import { createProjectWithSource } from './support/project.js';
 
 function firstBinding(code: string) {
-  const project = new Project({ useInMemoryFileSystem: true });
-  project.createSourceFile('bootstrap.ts', code);
-  return scanRoutes(project)[0];
+  return scanRoutes(createProjectWithSource(code))[0];
 }
 
 test('resolveHandler resolves a static controller method', () => {

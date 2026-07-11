@@ -1,18 +1,15 @@
-import { Project } from 'ts-morph';
 import { expect, test, vi } from 'vitest';
-import { buildOpenApi } from './openapi-builder.js';
-import { resolveHandler } from './handler-resolver.js';
-import { scanRoutes } from './route-scanner.js';
-import { extractTypes } from './type-extractor.js';
-import { scanNestRoutes } from './nest-scanner.js';
+import { buildOpenApi } from '../src/openapi-builder.js';
+import { extractTypes } from '../src/type-extractor.js';
+import { scanNestRoutes } from '../src/nest-scanner.js';
+import { createProjectWithSource, scanResolvedRoutes } from './support/project.js';
+import { typesOfDeclarationsIn } from './support/types.js';
 
 function inputsFrom(code: string) {
-  const project = new Project({ useInMemoryFileSystem: true });
-  project.createSourceFile('bootstrap.ts', code);
-  return scanRoutes(project).map((b) => {
-    const route = resolveHandler(b)!;
-    return { route, types: extractTypes(route) };
-  });
+  return scanResolvedRoutes(createProjectWithSource(code)).map((route) => ({
+    route,
+    types: extractTypes(route),
+  }));
 }
 
 test('builds an OpenAPI doc with templated path, params, body and response', () => {
@@ -123,9 +120,7 @@ test('adds configured security schemes, defaults and path-glob overrides', () =>
 });
 
 test('drops default security for Nest methods with the configured public decorator', () => {
-  const project = new Project({ useInMemoryFileSystem: true });
-  project.createSourceFile(
-    'nest.ts',
+  const project = createProjectWithSource(
     `
       function Controller(path?: string): ClassDecorator { return () => {}; }
       function Get(path?: string): MethodDecorator { return () => {}; }
@@ -146,6 +141,7 @@ test('drops default security for Nest methods with the configured public decorat
         }
       }
     `,
+    'nest.ts',
   );
 
   const doc = buildOpenApi(scanNestRoutes(project), undefined, {
@@ -162,18 +158,18 @@ test('drops default security for Nest methods with the configured public decorat
 });
 
 test('keeps same-named components distinct across route inputs', () => {
-  const project = new Project({ useInMemoryFileSystem: true });
-  project.createSourceFile('/public.ts', `export interface User { a: string }`);
-  project.createSourceFile('/admin.ts', `export interface User { b: number }`);
-  const sf = project.createSourceFile(
-    '/types.ts',
-    `import type { User as PublicUser } from './public';
+  const [aType, bType] = typesOfDeclarationsIn(
+    {
+      '/public.ts': `export interface User { a: string }`,
+      '/admin.ts': `export interface User { b: number }`,
+      '/types.ts': `import type { User as PublicUser } from './public';
      import type { User as AdminUser } from './admin';
      declare const a: PublicUser;
      declare const b: AdminUser;`,
+    },
+    '/types.ts',
+    ['a', 'b'],
   );
-  const aType = sf.getVariableDeclarationOrThrow('a').getType();
-  const bType = sf.getVariableDeclarationOrThrow('b').getType();
 
   const doc = buildOpenApi([
     {
