@@ -80,3 +80,34 @@ test('records the resolver function node for each procedure', () => {
 
   expect(procedure.resolver.getText()).toBe("() => ({ id: '1' })");
 });
+
+test('records the enclosing query/mutation call so its receiver chain (e.g. .input()) stays reachable', () => {
+  const project = createProjectWithSource(`
+    ${STUBS}
+    const appRouter = router({
+      getUser: procedure.input({}).query(() => ({ id: '1' })),
+    });
+  `);
+
+  const [procedure] = scanTrpcRouters(project);
+
+  expect(procedure.call.getText()).toBe("procedure.input({}).query(() => ({ id: '1' }))");
+});
+
+test('resolves shorthand-property routers and procedures', () => {
+  const project = createProjectWithSource(`
+    ${STUBS}
+    const userRouter = router({
+      getById: procedure.query(() => ({ id: '1' })),
+    });
+    const health = procedure.query(() => ({ ok: true }));
+    const appRouter = router({ userRouter, health });
+  `);
+
+  const procedures = scanTrpcRouters(project);
+
+  expect(procedures.map((p) => [p.path, p.kind])).toEqual([
+    ['userRouter.getById', 'query'],
+    ['health', 'query'],
+  ]);
+});
