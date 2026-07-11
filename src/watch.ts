@@ -44,6 +44,7 @@ export function createWatchSession(
   const debounceMs = options.debounceMs ?? DEFAULT_DEBOUNCE_MS;
   let timer: unknown;
   let closed = false;
+  let sigintHandler: (() => void) | undefined;
 
   const run = (): void => {
     if (closed) return;
@@ -72,14 +73,16 @@ export function createWatchSession(
       closed = true;
       if (timer) deps.clearTimer(timer);
       for (const watcher of watchers) watcher.close();
+      if (sigintHandler) process.removeListener('SIGINT', sigintHandler);
     },
   };
 
   if (options.installSigintHandler ?? true) {
-    process.once('SIGINT', () => {
+    sigintHandler = () => {
       session.close();
       process.exit(0);
-    });
+    };
+    process.once('SIGINT', sigintHandler);
   }
 
   return session;

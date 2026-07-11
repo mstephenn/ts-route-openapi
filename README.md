@@ -7,6 +7,8 @@ Generate an **OpenAPI 3.0.3** spec from a TypeScript route→controller codebase
 statically analyzing the source with [ts-morph](https://ts-morph.com/) — **no
 runtime instrumentation, decorators, JSDoc, or annotations required**.
 
+![ts-route-openapi preview](https://raw.githubusercontent.com/mstephenn/ts-route-openapi/main/assets/preview.gif)
+
 Your route registrations and TypeScript types *are* the documentation:
 
 ```ts
