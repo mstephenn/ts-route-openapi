@@ -110,8 +110,8 @@ test('express: enum/const status arguments resolve via the type checker', () => 
   expect(types.responses?.map((r) => r.status)).toEqual([201, 404]);
 });
 
-test('express: a shadowed res in a nested closure is not misattributed', () => {
-  const [route] = routesFrom(`
+test('a shadowed param in a nested closure is not misattributed for either express or fastify', () => {
+  const [expressRoute] = routesFrom(`
     ${EXPRESS_DECLS}
     declare const app: any;
     app.get('/x', (req: Request, res: Response<{ ok: boolean }>) => {
@@ -119,7 +119,15 @@ test('express: a shadowed res in a nested closure is not misattributed', () => {
       res.json({ ok: true });
     });
   `);
-  const types = extractTypes(route);
+  const [fastifyRoute] = routesFrom(`
+    interface FastifyRequest<RG = unknown> { params: unknown }
+    interface FastifyReply { code(n: number): FastifyReply }
+    declare const app: any;
+    app.get('/x', (req: FastifyRequest, reply: FastifyReply) => {
+      [1].forEach((reply: any) => reply.code(500));
+    });
+  `);
 
-  expect(types.responses?.map((r) => r.status)).toEqual([200]);
+  expect(extractTypes(expressRoute).responses?.map((r) => r.status)).toEqual([200]);
+  expect(extractTypes(fastifyRoute).responses).toBeUndefined();
 });
