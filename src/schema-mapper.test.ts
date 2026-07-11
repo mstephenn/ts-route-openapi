@@ -165,3 +165,37 @@ test('does not blow the stack on recursive library types (inlined, cycle-truncat
   });
   expect(result.components).toEqual({});
 });
+
+test('numeric-literal unions map to a number enum', () => {
+  expect(mapType(typeOf('1 | 2 | 3')).schema).toEqual({ type: 'number', enum: [1, 2, 3] });
+});
+
+test('mixed multi-type unions map to oneOf', () => {
+  expect(mapType(typeOf('string | number')).schema).toEqual({
+    oneOf: [{ type: 'string' }, { type: 'number' }],
+  });
+  expect(mapType(typeOf("'a' | 'b' | number")).schema).toEqual({
+    oneOf: [{ type: 'string', enum: ['a', 'b'] }, { type: 'number' }],
+  });
+});
+
+test('discriminated object unions hoist members and reference them in oneOf', () => {
+  const project = new Project({ useInMemoryFileSystem: true });
+  const sf = project.createSourceFile(
+    't.ts',
+    `interface Cat { kind: 'cat'; lives: number }
+     interface Dog { kind: 'dog'; good: boolean }
+     declare const value: Cat | Dog;`,
+  );
+  const type = sf.getVariableDeclarationOrThrow('value').getType();
+
+  const result = mapType(type);
+
+  expect(result.schema).toEqual({
+    oneOf: [
+      { $ref: '#/components/schemas/Cat' },
+      { $ref: '#/components/schemas/Dog' },
+    ],
+  });
+  expect(Object.keys(result.components).sort()).toEqual(['Cat', 'Dog']);
+});

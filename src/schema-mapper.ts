@@ -42,17 +42,32 @@ function toSchema(type: Type, components: Components, seen: Set<string>, inlinin
   }
 
   if (type.isUnion()) {
-    const parts = type.getUnionTypes();
-    if (parts.length > 0 && parts.every((p) => p.isStringLiteral())) {
-      return { type: 'string', enum: parts.map((p) => p.getLiteralValue() as string) };
+    // Strip null/undefined, then group members: same-kind literals collapse
+    // into one enum schema, booleans recombine (TS expands `boolean` to
+    // `true | false`), everything else maps individually. A single resulting
+    // schema is returned directly; several become a `oneOf`.
+    const defined = type.getUnionTypes().filter((p) => !p.isUndefined() && !p.isNull());
+    const stringLiterals: string[] = [];
+    const numberLiterals: number[] = [];
+    let hasBoolean = false;
+    const others: Type[] = [];
+
+    for (const part of defined) {
+      if (part.isStringLiteral()) stringLiterals.push(part.getLiteralValue() as string);
+      else if (part.isNumberLiteral()) numberLiterals.push(part.getLiteralValue() as number);
+      else if (part.isBooleanLiteral() || part.isBoolean()) hasBoolean = true;
+      else others.push(part);
     }
-    const defined = parts.filter((p) => !p.isUndefined() && !p.isNull());
-    if (defined.length === 1) return toSchema(defined[0], components, seen, inlining);
-    // `boolean` collapses to the union `true | false` (plus `undefined` when
-    // optional); recombine those literal members into a single boolean schema.
-    if (defined.length > 0 && defined.every((p) => p.isBooleanLiteral() || p.isBoolean())) {
-      return { type: 'boolean' };
-    }
+
+    const schemas: Schema[] = [];
+    if (stringLiterals.length > 0) schemas.push({ type: 'string', enum: stringLiterals });
+    if (numberLiterals.length > 0) schemas.push({ type: 'number', enum: numberLiterals });
+    if (hasBoolean) schemas.push({ type: 'boolean' });
+    for (const other of others) schemas.push(toSchema(other, components, seen, inlining));
+
+    if (schemas.length === 0) return {};
+    if (schemas.length === 1) return schemas[0];
+    return { oneOf: schemas };
   }
 
   if (type.isObject()) {
