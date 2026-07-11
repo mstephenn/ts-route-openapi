@@ -1,5 +1,5 @@
 import { STATUS_CODES } from 'node:http';
-import { mapType } from './schema-mapper.js';
+import { createSchemaMapper, type SchemaMapper } from './schema-mapper.js';
 import type { ResolvedRoute, RouteTypes } from './types.js';
 
 export interface RouteInput {
@@ -27,22 +27,16 @@ export function buildOpenApi(
   info: ApiInfo = { title: 'API', version: '1.0.0' },
 ): Json {
   const paths: Record<string, Json> = {};
-  const components: Record<string, Json> = {};
-
-  const mergeComponents = (extra: Record<string, Json>): void => {
-    Object.assign(components, extra);
-  };
+  const schemaMapper = createSchemaMapper();
 
   for (const { route, types } of inputs) {
     const operation: Json = {};
     const parameters: Json[] = [];
 
     // A param without static type information documents as a string.
-    const paramSchema = (p: { type?: Parameters<typeof mapType>[0] }): Json => {
+    const paramSchema = (p: { type?: Parameters<SchemaMapper['mapType']>[0] }): Json => {
       if (!p.type) return { type: 'string' };
-      const { schema, components: c } = mapType(p.type);
-      mergeComponents(c);
-      return schema;
+      return schemaMapper.mapType(p.type);
     };
 
     for (const p of types.pathParams) {
@@ -54,8 +48,7 @@ export function buildOpenApi(
     if (parameters.length > 0) operation.parameters = parameters;
 
     if (types.body) {
-      const { schema, components: c } = mapType(types.body);
-      mergeComponents(c);
+      const schema = schemaMapper.mapType(types.body);
       operation.requestBody = { content: { 'application/json': { schema } } };
     }
 
@@ -64,8 +57,7 @@ export function buildOpenApi(
     for (const entry of entries) {
       const response: Json = { description: STATUS_CODES[entry.status] ?? 'Response' };
       if (entry.type && !BODILESS_STATUSES.has(entry.status)) {
-        const { schema, components: c } = mapType(entry.type);
-        mergeComponents(c);
+        const schema = schemaMapper.mapType(entry.type);
         response.content = { 'application/json': { schema } };
       }
       responses[String(entry.status)] = response;
@@ -78,6 +70,8 @@ export function buildOpenApi(
   }
 
   const doc: Json = { openapi: '3.0.3', info, paths };
-  if (Object.keys(components).length > 0) doc.components = { schemas: components };
+  if (Object.keys(schemaMapper.components).length > 0) {
+    doc.components = { schemas: schemaMapper.components };
+  }
   return doc;
 }
