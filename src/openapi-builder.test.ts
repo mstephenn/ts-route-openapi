@@ -1,5 +1,5 @@
 import { Project } from 'ts-morph';
-import { expect, test } from 'vitest';
+import { expect, test, vi } from 'vitest';
 import { buildOpenApi } from './openapi-builder.js';
 import { resolveHandler } from './handler-resolver.js';
 import { scanRoutes } from './route-scanner.js';
@@ -83,4 +83,131 @@ test('keeps same-named components distinct across route inputs', () => {
   });
   expect(doc.components.schemas.User.properties).toEqual({ a: { type: 'string' } });
   expect(doc.components.schemas.User_admin.properties).toEqual({ b: { type: 'number' } });
+});
+
+test('maps Hono zValidator json and query schemas into the operation', () => {
+  const doc = buildOpenApi(
+    inputsFrom(`
+      declare const app: any;
+      declare const z: any;
+      declare const zValidator: any;
+      const bodySchema = z.object({
+        name: z.string(),
+        age: z.number().optional(),
+        tags: z.array(z.string()),
+        status: z.union([z.literal('active'), z.literal('paused')]),
+      });
+      app.post(
+        '/users',
+        zValidator('json', bodySchema),
+        zValidator('query', z.object({ verbose: z.boolean().optional() })),
+        (c: any) => ({ ok: true }),
+      );
+    `),
+  ) as any;
+
+  const op = doc.paths['/users'].post;
+  expect(op.requestBody.content['application/json'].schema).toEqual({
+    type: 'object',
+    properties: {
+      name: { type: 'string' },
+      age: { type: 'number' },
+      tags: { type: 'array', items: { type: 'string' } },
+      status: { type: 'string', enum: ['active', 'paused'] },
+    },
+    required: ['name', 'tags', 'status'],
+  });
+  expect(op.parameters).toContainEqual({
+    name: 'verbose',
+    in: 'query',
+    required: false,
+    schema: { type: 'boolean' },
+  });
+});
+
+test('maps Fastify route schema object literals into body, querystring and params', () => {
+  const doc = buildOpenApi(
+    inputsFrom(`
+      declare const app: any;
+      app.post('/orders/:id', {
+        schema: {
+          params: {
+            type: 'object',
+            properties: { id: { type: 'string' } },
+            required: ['id'],
+          },
+          querystring: {
+            type: 'object',
+            properties: { limit: { type: 'number' } },
+          },
+          body: {
+            type: 'object',
+            properties: { sku: { type: 'string' } },
+            required: ['sku'],
+          },
+        },
+      }, () => ({ ok: true }));
+    `),
+  ) as any;
+
+  const op = doc.paths['/orders/{id}'].post;
+  expect(op.parameters).toContainEqual({
+    name: 'id',
+    in: 'path',
+    required: true,
+    schema: { type: 'string' },
+  });
+  expect(op.parameters).toContainEqual({
+    name: 'limit',
+    in: 'query',
+    required: false,
+    schema: { type: 'number' },
+  });
+  expect(op.requestBody.content['application/json'].schema).toEqual({
+    type: 'object',
+    properties: { sku: { type: 'string' } },
+    required: ['sku'],
+  });
+});
+
+test('maps Fastify route Zod schemas in route options', () => {
+  const doc = buildOpenApi(
+    inputsFrom(`
+      declare const app: any;
+      declare const z: any;
+      app.post('/orders', {
+        schema: {
+          body: z.object({ sku: z.string(), count: z.number().nullable() }),
+        },
+      }, () => ({ ok: true }));
+    `),
+  ) as any;
+
+  expect(doc.paths['/orders'].post.requestBody.content['application/json'].schema).toEqual({
+    type: 'object',
+    properties: {
+      sku: { type: 'string' },
+      count: { type: 'number', nullable: true },
+    },
+    required: ['sku', 'count'],
+  });
+});
+
+test('unsupported Zod constructs emit an empty schema with a warning', () => {
+  const warn = vi.spyOn(console, 'warn').mockImplementation(() => undefined);
+
+  const doc = buildOpenApi(
+    inputsFrom(`
+      declare const app: any;
+      declare const z: any;
+      declare const zValidator: any;
+      app.post('/events', zValidator('json', z.record(z.string())), () => undefined);
+    `),
+  ) as any;
+
+  expect(doc.paths['/events'].post.requestBody.content['application/json'].schema).toEqual({});
+  expect(warn).toHaveBeenCalledWith(
+    'ts-route-openapi: unsupported Zod schema construct; emitted {} for z.record(z.string())',
+  );
+  warn.mockRestore();
 });

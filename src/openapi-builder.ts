@@ -1,6 +1,6 @@
 import { STATUS_CODES } from 'node:http';
-import { createSchemaMapper, type SchemaMapper } from './schema-mapper.js';
-import type { ResolvedRoute, RouteTypes } from './types.js';
+import { createSchemaMapper } from './schema-mapper.js';
+import type { ParamType, ResolvedRoute, RouteTypes } from './types.js';
 
 export interface RouteInput {
   route: ResolvedRoute;
@@ -34,7 +34,8 @@ export function buildOpenApi(
     const parameters: Json[] = [];
 
     // A param without static type information documents as a string.
-    const paramSchema = (p: { type?: Parameters<SchemaMapper['mapType']>[0] }): Json => {
+    const paramSchema = (p: ParamType): Json => {
+      if (p.schema) return p.schema;
       if (!p.type) return { type: 'string' };
       return schemaMapper.mapType(p.type);
     };
@@ -47,8 +48,8 @@ export function buildOpenApi(
     }
     if (parameters.length > 0) operation.parameters = parameters;
 
-    if (types.body) {
-      const schema = schemaMapper.mapType(types.body);
+    if (types.bodySchema || types.body) {
+      const schema = types.bodySchema ?? schemaMapper.mapType(types.body!);
       operation.requestBody = { content: { 'application/json': { schema } } };
     }
 

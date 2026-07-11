@@ -23,14 +23,32 @@ export function scanRoutes(project: Project, verbs: HttpVerb[] = DEFAULT_VERBS):
       if (args.length < 2) return;
       const pathArg = args[0];
       if (!Node.isStringLiteral(pathArg)) return;
+      const handlerIndex = lastHandlerIndex(args);
+      if (handlerIndex < 1) return;
 
       bindings.push({
         verb: callee.getName() as HttpVerb,
         path: pathArg.getLiteralValue(),
-        handlerExpression: args[1],
+        handlerExpression: args[handlerIndex],
+        middlewareExpressions: args.slice(1, handlerIndex),
       });
     });
   }
 
   return bindings;
+}
+
+function lastHandlerIndex(args: Node[]): number {
+  for (let index = args.length - 1; index >= 1; index -= 1) {
+    const arg = args[index];
+    if (
+      Node.isArrowFunction(arg) ||
+      Node.isFunctionExpression(arg) ||
+      Node.isIdentifier(arg) ||
+      Node.isPropertyAccessExpression(arg)
+    ) {
+      return index;
+    }
+  }
+  return -1;
 }

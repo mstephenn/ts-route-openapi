@@ -25,6 +25,21 @@ test('scanRoutes finds verb, path and handler expression', () => {
   expect(bindings[0].handlerExpression.getText()).toBe('UsersController.getById');
 });
 
+test('scanRoutes accepts middleware between path and handler', () => {
+  const project = projectWith(`
+    declare const app: any;
+    declare const mw1: any;
+    declare const mw2: any;
+    const handler = () => {};
+    app.post('/users', mw1, mw2, handler);
+  `);
+
+  const [binding] = scanRoutes(project);
+
+  expect(binding.handlerExpression.getText()).toBe('handler');
+  expect(binding.middlewareExpressions.map((expr) => expr.getText())).toEqual(['mw1', 'mw2']);
+});
+
 test('scanRoutes ignores non-route method calls and calls without a string path', () => {
   const project = projectWith(`
     declare const app: any;
