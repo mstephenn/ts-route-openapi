@@ -1,4 +1,4 @@
-import { Node, type CallExpression, type Type } from 'ts-morph';
+import { Node, type CallExpression, type FunctionLikeDeclaration, type Type } from 'ts-morph';
 import { unwrapPromise } from './frameworks/shared.js';
 import { schemaFromZodExpression } from './validator-schemas.js';
 import type { TrpcProcedure } from './trpc-scanner.js';
@@ -40,15 +40,25 @@ function chainSchema(call: CallExpression, method: string): Schema | undefined {
   return arg && Node.isExpression(arg) ? schemaFromZodExpression(arg) : undefined;
 }
 
-function resolverReturnType(resolver: Node): Type | undefined {
-  if (
-    Node.isArrowFunction(resolver) ||
-    Node.isFunctionExpression(resolver) ||
-    Node.isFunctionDeclaration(resolver)
-  ) {
-    return unwrapPromise(resolver.getReturnType());
+/** The function-like declaration a resolver node is or refers to, following a named/hoisted function reference. */
+function resolverFunction(resolver: Node): FunctionLikeDeclaration | undefined {
+  if (Node.isFunctionLikeDeclaration(resolver)) return resolver;
+
+  if (Node.isIdentifier(resolver)) {
+    const declaration = resolver.getSymbol()?.getDeclarations()[0];
+    if (Node.isFunctionLikeDeclaration(declaration)) return declaration;
+    if (declaration && Node.isVariableDeclaration(declaration)) {
+      const initializer = declaration.getInitializer();
+      if (Node.isFunctionLikeDeclaration(initializer)) return initializer;
+    }
   }
+
   return undefined;
+}
+
+function resolverReturnType(resolver: Node): Type | undefined {
+  const fn = resolverFunction(resolver);
+  return fn ? unwrapPromise(fn.getReturnType()) : undefined;
 }
 
 /** Extract a tRPC procedure's `.input()`/`.output()` schemas and (Promise-unwrapped) resolver return type. */

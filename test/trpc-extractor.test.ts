@@ -115,3 +115,20 @@ test('neither .input() nor .output() present: only the response type is inferred
   expect(io.outputSchema).toBeUndefined();
   expect(io.responseType?.getText()).toBe('{ ok: boolean; }');
 });
+
+test('resolves the response type for a named function reference, not just an inline closure', () => {
+  const procedure = firstProcedure(`
+    ${STUBS}
+    interface User { id: string }
+    async function getUserHandler(): Promise<User> {
+      return { id: '1' };
+    }
+    const appRouter = router({
+      getUser: procedure.query(getUserHandler),
+    });
+  `);
+
+  const io = extractTrpcProcedureIO(procedure);
+
+  expect(io.responseType?.getText()).toBe('User');
+});
