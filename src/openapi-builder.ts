@@ -78,8 +78,8 @@ export function buildOpenApi(
     const entries = types.responses ?? [{ status: 200, type: types.response }];
     for (const entry of entries) {
       const response: ResponseObject = { description: STATUS_CODES[entry.status] ?? 'Response' };
-      if (entry.type && !BODILESS_STATUSES.has(entry.status)) {
-        const schema = schemaMapper.mapType(entry.type);
+      if ((entry.schema || entry.type) && !BODILESS_STATUSES.has(entry.status)) {
+        const schema = entry.schema ?? schemaMapper.mapType(entry.type!);
         response.content = { 'application/json': { schema } };
       }
       responses[String(entry.status)] = response;

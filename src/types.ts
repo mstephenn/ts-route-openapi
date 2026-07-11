@@ -47,6 +47,8 @@ export interface ParamType {
 export interface ResponseType {
   status: number;
   type?: Type;
+  /** Pre-computed OpenAPI schema (e.g. from a validator or RPC output schema). Takes precedence over `type`. */
+  schema?: Schema;
 }
 
 /** Types extracted from a resolved route's handler signature. */

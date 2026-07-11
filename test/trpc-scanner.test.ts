@@ -1,16 +1,7 @@
 import { expect, test } from 'vitest';
 import { scanTrpcRouters } from '../src/trpc-scanner.js';
 import { createProjectWithSource } from './support/project.js';
-
-const STUBS = `
-  interface ProcedureBuilder {
-    input(schema: unknown): ProcedureBuilder;
-    query(resolver: (...args: any[]) => unknown): unknown;
-    mutation(resolver: (...args: any[]) => unknown): unknown;
-  }
-  declare const procedure: ProcedureBuilder;
-  declare function router<T>(procedures: T): T;
-`;
+import { TRPC_STUBS as STUBS } from './support/trpc.js';
 
 test('discovers procedures from a flat router', () => {
   const project = createProjectWithSource(`

@@ -11,6 +11,8 @@ export interface TrpcProcedureIO {
   outputSchema?: Schema;
   /** Resolver return type (Promise-unwrapped); only computed when there's no `.output()` schema. */
   responseType?: Type;
+  /** The resolver, resolved to its function-like declaration when it's a named/hoisted reference. */
+  resolverFn?: FunctionLikeDeclaration;
 }
 
 /** Every call in `call`'s receiver chain, outermost first (e.g. `.query()`, then `.output()`, then `.input()`). */
@@ -41,7 +43,7 @@ function chainSchema(call: CallExpression, method: string): Schema | undefined {
 }
 
 /** The function-like declaration a resolver node is or refers to, following a named/hoisted function reference. */
-function resolverFunction(resolver: Node): FunctionLikeDeclaration | undefined {
+export function resolverFunction(resolver: Node): FunctionLikeDeclaration | undefined {
   if (Node.isFunctionLikeDeclaration(resolver)) return resolver;
 
   if (Node.isIdentifier(resolver)) {
@@ -56,16 +58,12 @@ function resolverFunction(resolver: Node): FunctionLikeDeclaration | undefined {
   return undefined;
 }
 
-function resolverReturnType(resolver: Node): Type | undefined {
-  const fn = resolverFunction(resolver);
-  return fn ? unwrapPromise(fn.getReturnType()) : undefined;
-}
-
 /** Extract a tRPC procedure's `.input()`/`.output()` schemas and (Promise-unwrapped) resolver return type. */
 export function extractTrpcProcedureIO(procedure: TrpcProcedure): TrpcProcedureIO {
   const inputSchema = chainSchema(procedure.call, 'input');
   const outputSchema = chainSchema(procedure.call, 'output');
-  const responseType = outputSchema ? undefined : resolverReturnType(procedure.resolver);
+  const resolverFn = resolverFunction(procedure.resolver);
+  const responseType = outputSchema || !resolverFn ? undefined : unwrapPromise(resolverFn.getReturnType());
 
-  return { inputSchema, outputSchema, responseType };
+  return { inputSchema, outputSchema, responseType, resolverFn };
 }
