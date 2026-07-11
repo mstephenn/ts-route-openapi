@@ -47,7 +47,7 @@ export interface ParamType {
 export interface ResponseType {
   status: number;
   type?: Type;
-  /** Validator-derived OpenAPI schema. Takes precedence over `type`. */
+  /** Pre-computed OpenAPI schema (e.g. from a validator or RPC output schema). Takes precedence over `type`. */
   schema?: Schema;
 }
 

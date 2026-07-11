@@ -3,18 +3,7 @@ import { buildOpenApi } from '../src/openapi-builder.js';
 import { scanTrpcRoutes } from '../src/trpc-routes.js';
 import { getOperation } from './support/openapi.js';
 import { createProjectWithSource } from './support/project.js';
-
-const STUBS = `
-  declare const z: any;
-  interface ProcedureBuilder {
-    input(schema: unknown): ProcedureBuilder;
-    output(schema: unknown): ProcedureBuilder;
-    query(resolver: (...args: any[]) => unknown): unknown;
-    mutation(resolver: (...args: any[]) => unknown): unknown;
-  }
-  declare const procedure: ProcedureBuilder;
-  declare function router<T>(procedures: T): T;
-`;
+import { TRPC_STUBS as STUBS } from './support/trpc.js';
 
 test('maps a small tRPC router end-to-end to the expected OpenAPI paths', () => {
   const project = createProjectWithSource(`
@@ -75,4 +64,18 @@ test('defaults to the /trpc base path and supports a configurable base path', ()
   const customDoc = buildOpenApi(scanTrpcRoutes(project, { basePath: '/api/rpc' }));
   expect(customDoc.paths['/api/rpc/health']).toBeDefined();
   expect(customDoc.paths['/trpc/health']).toBeUndefined();
+});
+
+test('normalizes a trailing slash on a configured base path', () => {
+  const project = createProjectWithSource(`
+    ${STUBS}
+    const appRouter = router({
+      health: procedure.query(() => ({ ok: true })),
+    });
+  `);
+
+  const doc = buildOpenApi(scanTrpcRoutes(project, { basePath: '/api/rpc/' }));
+
+  expect(doc.paths['/api/rpc/health']).toBeDefined();
+  expect(Object.keys(doc.paths)).not.toContain('/api/rpc//health');
 });

@@ -2,18 +2,7 @@ import { expect, test } from 'vitest';
 import { extractTrpcProcedureIO } from '../src/trpc-extractor.js';
 import { scanTrpcRouters } from '../src/trpc-scanner.js';
 import { createProjectWithSource } from './support/project.js';
-
-const STUBS = `
-  declare const z: any;
-  interface ProcedureBuilder {
-    input(schema: unknown): ProcedureBuilder;
-    output(schema: unknown): ProcedureBuilder;
-    query(resolver: (...args: any[]) => unknown): unknown;
-    mutation(resolver: (...args: any[]) => unknown): unknown;
-  }
-  declare const procedure: ProcedureBuilder;
-  declare function router<T>(procedures: T): T;
-`;
+import { TRPC_STUBS as STUBS } from './support/trpc.js';
 
 function firstProcedure(code: string) {
   const project = createProjectWithSource(code);
