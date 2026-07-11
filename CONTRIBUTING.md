@@ -26,4 +26,5 @@ The ruleset blocks branch deletion and force pushes, requires pull requests,
 requires one approving review, dismisses stale reviews after new pushes, and
 requires review threads to be resolved.
 
-No users or teams are configured as bypass actors.
+Repository administrators, including the owner, can bypass the ruleset when
+needed.
