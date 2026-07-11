@@ -3,6 +3,15 @@ import { createSchemaMapper } from './schema-mapper.js';
 import { jsDocText } from './jsdoc.js';
 import type { GeneratorConfig, SecurityRequirement } from './config.js';
 import type { ParamType, ResolvedRoute, RouteTypes } from './types.js';
+import type {
+  ComponentsObject,
+  OpenApiDocument,
+  OperationObject,
+  ParameterObject,
+  PathItemObject,
+  ResponseObject,
+  SchemaObject,
+} from './openapi-types.js';
 
 export interface RouteInput {
   route: ResolvedRoute;
@@ -19,8 +28,6 @@ export interface BuildOptions {
   config?: GeneratorConfig;
 }
 
-type Json = Record<string, unknown>;
-
 /** Statuses that must not carry a response body per HTTP semantics. */
 const BODILESS_STATUSES = new Set([204, 205, 304]);
 
@@ -33,12 +40,12 @@ export function buildOpenApi(
   inputs: RouteInput[],
   info: ApiInfo = { title: 'API', version: '1.0.0' },
   options: BuildOptions = {},
-): Json {
-  const paths: Record<string, Json> = {};
+): Record<string, unknown> {
+  const paths: Record<string, PathItemObject> = {};
   const schemaMapper = createSchemaMapper({ descriptions: options.descriptions });
 
   for (const { route, types } of inputs) {
-    const operation: Json = {};
+    const operation: OperationObject = { responses: {} };
     if (options.descriptions) {
       const docs = jsDocText(route.method);
       if (docs.summary) operation.summary = docs.summary;
@@ -47,10 +54,10 @@ export function buildOpenApi(
     }
     const security = operationSecurity(route, options.config);
     if (security) operation.security = security;
-    const parameters: Json[] = [];
+    const parameters: ParameterObject[] = [];
 
     // A param without static type information documents as a string.
-    const paramSchema = (p: ParamType): Json => {
+    const paramSchema = (p: ParamType): SchemaObject => {
       if (p.schema) return p.schema;
       if (!p.type) return { type: 'string' };
       return schemaMapper.mapType(p.type);
@@ -69,10 +76,10 @@ export function buildOpenApi(
       operation.requestBody = { content: { 'application/json': { schema } } };
     }
 
-    const responses: Json = {};
+    const responses: Record<string, ResponseObject> = {};
     const entries = types.responses ?? [{ status: 200, type: types.response }];
     for (const entry of entries) {
-      const response: Json = { description: STATUS_CODES[entry.status] ?? 'Response' };
+      const response: ResponseObject = { description: STATUS_CODES[entry.status] ?? 'Response' };
       if (entry.type && !BODILESS_STATUSES.has(entry.status)) {
         const schema = schemaMapper.mapType(entry.type);
         response.content = { 'application/json': { schema } };
@@ -83,11 +90,11 @@ export function buildOpenApi(
 
     const oaPath = templatePath(route.path);
     paths[oaPath] ??= {};
-    (paths[oaPath] as Json)[route.verb] = operation;
+    paths[oaPath][route.verb] = operation;
   }
 
-  const doc: Json = { openapi: '3.0.3', info, paths };
-  const components: Json = {};
+  const doc: OpenApiDocument = { openapi: '3.0.3', info, paths };
+  const components: ComponentsObject = {};
   if (Object.keys(schemaMapper.components).length > 0) {
     components.schemas = schemaMapper.components;
   }
@@ -97,7 +104,7 @@ export function buildOpenApi(
   if (Object.keys(components).length > 0) {
     doc.components = components;
   }
-  return doc;
+  return doc as unknown as Record<string, unknown>;
 }
 
 function operationSecurity(

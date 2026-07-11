@@ -1,7 +1,9 @@
 import { expect, test, vi } from 'vitest';
 import { buildOpenApi } from '../src/openapi-builder.js';
+import type { OpenApiDocument } from '../src/openapi-types.js';
 import { extractTypes } from '../src/type-extractor.js';
 import { scanNestRoutes } from '../src/nest-scanner.js';
+import type { ResolvedRoute } from '../src/types.js';
 import { createProjectWithSource, scanResolvedRoutes } from './support/project.js';
 import { typesOfDeclarationsIn } from './support/types.js';
 
@@ -10,6 +12,11 @@ function inputsFrom(code: string) {
     route,
     types: extractTypes(route),
   }));
+}
+
+/** The `properties` of an object-shaped SchemaObject (`schema-mapper` keeps schema shapes untyped). */
+function schemaProperties(schema: unknown): Record<string, unknown> {
+  return (schema as { properties: Record<string, unknown> }).properties;
 }
 
 test('builds an OpenAPI doc with templated path, params, body and response', () => {
@@ -25,27 +32,27 @@ test('builds an OpenAPI doc with templated path, params, body and response', () 
       app.post('/orgs/:id/users', C.create);
     `),
     { title: 'Test API', version: '2.0.0' },
-  ) as any;
+  ) as unknown as OpenApiDocument;
 
   expect(doc.openapi).toBe('3.0.3');
   expect(doc.info).toEqual({ title: 'Test API', version: '2.0.0' });
 
-  const op = doc.paths['/orgs/{id}/users'].post;
+  const op = doc.paths['/orgs/{id}/users'].post!;
   expect(op.parameters).toContainEqual({
     name: 'id',
     in: 'path',
     required: true,
     schema: { type: 'string' },
   });
-  expect(op.requestBody.content['application/json'].schema).toEqual({
+  expect(op.requestBody!.content['application/json'].schema).toEqual({
     $ref: '#/components/schemas/CreateInput',
   });
-  expect(op.responses['200'].content['application/json'].schema).toEqual({
+  expect(op.responses['200'].content!['application/json'].schema).toEqual({
     type: 'object',
     properties: { ok: { type: 'boolean' } },
     required: ['ok'],
   });
-  expect(doc.components.schemas.CreateInput).toBeDefined();
+  expect(doc.components!.schemas!.CreateInput).toBeDefined();
 });
 
 test('adds handler JSDoc summary, description and deprecation when descriptions are enabled', () => {
@@ -64,11 +71,11 @@ test('adds handler JSDoc summary, description and deprecation when descriptions 
     `),
     undefined,
     { descriptions: true },
-  ) as any;
+  ) as unknown as OpenApiDocument;
 
-  expect(doc.paths['/users'].get.summary).toBe('List users.');
-  expect(doc.paths['/users'].get.description).toBe('Returns users visible to the caller.');
-  expect(doc.paths['/users'].get.deprecated).toBe(true);
+  expect(doc.paths['/users'].get!.summary).toBe('List users.');
+  expect(doc.paths['/users'].get!.description).toBe('Returns users visible to the caller.');
+  expect(doc.paths['/users'].get!.deprecated).toBe(true);
 });
 
 test('leaves documented routes unchanged when descriptions are disabled', () => {
@@ -85,12 +92,12 @@ test('leaves documented routes unchanged when descriptions are disabled', () => 
       declare const app: any;
       app.post('/users', create);
     `),
-  ) as any;
+  ) as unknown as OpenApiDocument;
 
-  const op = doc.paths['/users'].post;
+  const op = doc.paths['/users'].post!;
   expect(op.summary).toBeUndefined();
   expect(op.deprecated).toBeUndefined();
-  expect(doc.components.schemas.CreateInput.properties.name).toEqual({ type: 'string' });
+  expect(schemaProperties(doc.components!.schemas!.CreateInput).name).toEqual({ type: 'string' });
 });
 
 test('adds configured security schemes, defaults and path-glob overrides', () => {
@@ -110,13 +117,13 @@ test('adds configured security schemes, defaults and path-glob overrides', () =>
         securityOverrides: [{ method: 'GET', path: '/health', security: [] }],
       },
     },
-  ) as any;
+  ) as unknown as OpenApiDocument;
 
-  expect(doc.components.securitySchemes).toEqual({
+  expect(doc.components!.securitySchemes).toEqual({
     bearerAuth: { type: 'http', scheme: 'bearer' },
   });
-  expect(doc.paths['/health'].get.security).toEqual([]);
-  expect(doc.paths['/users/{id}'].get.security).toEqual([{ bearerAuth: [] }]);
+  expect(doc.paths['/health'].get!.security).toEqual([]);
+  expect(doc.paths['/users/{id}'].get!.security).toEqual([{ bearerAuth: [] }]);
 });
 
 test('drops default security for Nest methods with the configured public decorator', () => {
@@ -151,10 +158,10 @@ test('drops default security for Nest methods with the configured public decorat
       securityOverrides: [{ method: 'GET', path: '/status/admin', security: [{ bearerAuth: [] }] }],
       publicDecorator: 'Public',
     },
-  }) as any;
+  }) as unknown as OpenApiDocument;
 
-  expect(doc.paths['/status/health'].get.security).toEqual([]);
-  expect(doc.paths['/status/admin'].get.security).toEqual([{ bearerAuth: [] }]);
+  expect(doc.paths['/status/health'].get!.security).toEqual([]);
+  expect(doc.paths['/status/admin'].get!.security).toEqual([{ bearerAuth: [] }]);
 });
 
 test('keeps same-named components distinct across route inputs', () => {
@@ -173,23 +180,23 @@ test('keeps same-named components distinct across route inputs', () => {
 
   const doc = buildOpenApi([
     {
-      route: { verb: 'post', path: '/a' } as any,
+      route: { verb: 'post', path: '/a' } as unknown as ResolvedRoute,
       types: { pathParams: [], query: [], body: aType, responses: [{ status: 200 }] },
     },
     {
-      route: { verb: 'post', path: '/b' } as any,
+      route: { verb: 'post', path: '/b' } as unknown as ResolvedRoute,
       types: { pathParams: [], query: [], body: bType, responses: [{ status: 200 }] },
     },
-  ]) as any;
+  ]) as unknown as OpenApiDocument;
 
-  expect(doc.paths['/a'].post.requestBody.content['application/json'].schema).toEqual({
+  expect(doc.paths['/a'].post!.requestBody!.content['application/json'].schema).toEqual({
     $ref: '#/components/schemas/User',
   });
-  expect(doc.paths['/b'].post.requestBody.content['application/json'].schema).toEqual({
+  expect(doc.paths['/b'].post!.requestBody!.content['application/json'].schema).toEqual({
     $ref: '#/components/schemas/User_admin',
   });
-  expect(doc.components.schemas.User.properties).toEqual({ a: { type: 'string' } });
-  expect(doc.components.schemas.User_admin.properties).toEqual({ b: { type: 'number' } });
+  expect(doc.components!.schemas!.User.properties).toEqual({ a: { type: 'string' } });
+  expect(doc.components!.schemas!.User_admin.properties).toEqual({ b: { type: 'number' } });
 });
 
 test('maps Hono zValidator json and query schemas into the operation', () => {
@@ -211,10 +218,10 @@ test('maps Hono zValidator json and query schemas into the operation', () => {
         (c: any) => ({ ok: true }),
       );
     `),
-  ) as any;
+  ) as unknown as OpenApiDocument;
 
-  const op = doc.paths['/users'].post;
-  expect(op.requestBody.content['application/json'].schema).toEqual({
+  const op = doc.paths['/users'].post!;
+  expect(op.requestBody!.content['application/json'].schema).toEqual({
     type: 'object',
     properties: {
       name: { type: 'string' },
@@ -255,9 +262,9 @@ test('maps Fastify route schema object literals into body, querystring and param
         },
       }, () => ({ ok: true }));
     `),
-  ) as any;
+  ) as unknown as OpenApiDocument;
 
-  const op = doc.paths['/orders/{id}'].post;
+  const op = doc.paths['/orders/{id}'].post!;
   expect(op.parameters).toContainEqual({
     name: 'id',
     in: 'path',
@@ -270,7 +277,7 @@ test('maps Fastify route schema object literals into body, querystring and param
     required: false,
     schema: { type: 'number' },
   });
-  expect(op.requestBody.content['application/json'].schema).toEqual({
+  expect(op.requestBody!.content['application/json'].schema).toEqual({
     type: 'object',
     properties: { sku: { type: 'string' } },
     required: ['sku'],
@@ -288,9 +295,9 @@ test('maps Fastify route Zod schemas in route options', () => {
         },
       }, () => ({ ok: true }));
     `),
-  ) as any;
+  ) as unknown as OpenApiDocument;
 
-  expect(doc.paths['/orders'].post.requestBody.content['application/json'].schema).toEqual({
+  expect(doc.paths['/orders'].post!.requestBody!.content['application/json'].schema).toEqual({
     type: 'object',
     properties: {
       sku: { type: 'string' },
@@ -310,9 +317,9 @@ test('unsupported Zod constructs emit an empty schema with a warning', () => {
       declare const zValidator: any;
       app.post('/events', zValidator('json', z.record(z.string())), () => undefined);
     `),
-  ) as any;
+  ) as unknown as OpenApiDocument;
 
-  expect(doc.paths['/events'].post.requestBody.content['application/json'].schema).toEqual({});
+  expect(doc.paths['/events'].post!.requestBody!.content['application/json'].schema).toEqual({});
   expect(warn).toHaveBeenCalledWith(
     'ts-route-openapi: unsupported Zod schema construct; emitted {} for z.record(z.string())',
   );
