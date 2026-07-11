@@ -147,8 +147,9 @@ unwrapping `Promise<T>` to `T` when present.
   `required`.
 - String-literal unions (`'a' | 'b'`) map to `enum`.
 - `Date` maps to `{ type: string, format: date-time }`.
-- Named `interface`/`class` types declared in your project are hoisted into
-  `components.schemas` and referenced via `$ref`.
+- Named `interface`/`class`/`type` alias declarations from your project are
+  hoisted into `components.schemas` and referenced via `$ref` (recursive
+  types self-reference); library/`node_modules` types are inlined.
 
 ## Examples
 
@@ -162,12 +163,10 @@ install, run the CLI, get the spec.
 - **Validator-middleware types are not read**: schemas defined in Zod/TypeBox
   validators (common in Hono and Fastify setups) are not yet consulted — only
   signature-level types are.
-- **Single response**: only a `200` response is emitted; no error responses,
-  no auth, no other status codes.
-- **Type aliases are inlined, not hoisted**: only `interface`/`class`
-  declarations from project source files are hoisted into
-  `components.schemas`; type aliases and library/`node_modules` types are
-  always inlined.
+- **Status codes are detected, not exhaustive**: `res.status(N)` /
+  `reply.code(N)` / `@HttpCode(N)` produce per-status responses, but
+  statuses set by middleware, error filters, or thrown exceptions are not
+  seen. No auth documentation yet.
 - **Component name collisions are last-write-wins**: if two distinct types in
   the project share a name, whichever is hoisted last silently overwrites the
   earlier component in `components.schemas`. There is no collision detection.

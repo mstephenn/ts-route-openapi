@@ -20,6 +20,14 @@ function typeId(type: Type): number {
   return (type.compilerType as unknown as { id?: number }).id ?? -1;
 }
 
+/** True when the symbol is declared entirely in project source (not node_modules). */
+function symbolFromProjectSource(symbol: ReturnType<Type['getSymbol']>): boolean {
+  const declarations = symbol?.getDeclarations() ?? [];
+  return (
+    declarations.length > 0 && declarations.every((d) => !d.getSourceFile().isInNodeModules())
+  );
+}
+
 function toSchema(type: Type, components: Components, seen: Set<string>, inlining: Set<number>): Schema {
   if (type.isString()) return { type: 'string' };
   if (type.isNumber()) return { type: 'number' };
@@ -50,8 +58,7 @@ function toSchema(type: Type, components: Components, seen: Set<string>, inlinin
   if (type.isObject()) {
     const symbol = type.getSymbol();
     const name = symbol?.getName();
-    const declarations = symbol?.getDeclarations() ?? [];
-    const isFromProjectSource = declarations.length > 0 && declarations.every((d) => !d.getSourceFile().isInNodeModules());
+    const isFromProjectSource = symbolFromProjectSource(symbol);
 
     if (name === 'Date' && !isFromProjectSource) {
       return { type: 'string', format: 'date-time' };
@@ -61,13 +68,21 @@ function toSchema(type: Type, components: Components, seen: Set<string>, inlinin
     // representation; skip them rather than hoisting their method signatures.
     if (type.getCallSignatures().length > 0) return {};
 
-    const isNamed = !!name && name !== '__type' && name !== '__object';
-    if (isNamed && isFromProjectSource) {
-      if (!seen.has(name)) {
-        seen.add(name);
-        components[name] = objectSchema(type, components, seen, inlining);
+    // Hoist under a project-source name: the alias name (`type User = {...}`)
+    // wins over the structural symbol name (interface/class).
+    const aliasSymbol = type.getAliasSymbol();
+    const aliasName =
+      aliasSymbol && symbolFromProjectSource(aliasSymbol) ? aliasSymbol.getName() : undefined;
+    const symbolName =
+      name && name !== '__type' && name !== '__object' && isFromProjectSource ? name : undefined;
+    const hoistName = aliasName ?? symbolName;
+
+    if (hoistName) {
+      if (!seen.has(hoistName)) {
+        seen.add(hoistName);
+        components[hoistName] = objectSchema(type, components, seen, inlining);
       }
-      return { $ref: `#/components/schemas/${name}` };
+      return { $ref: `#/components/schemas/${hoistName}` };
     }
 
     // Inlined (non-hoisted) objects can be self-referential — e.g. recursive
