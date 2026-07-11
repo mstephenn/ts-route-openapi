@@ -4,8 +4,11 @@ import { resolveHandler } from './handler-resolver.js';
 import { extractTypes } from './type-extractor.js';
 import { scanNestRoutes } from './nest-scanner.js';
 import { buildOpenApi, type ApiInfo, type BuildOptions, type RouteInput } from './openapi-builder.js';
+import { loadConfig, type GeneratorConfig } from './config.js';
 
-export type GenerateOptions = BuildOptions;
+export interface GenerateOptions extends Omit<BuildOptions, 'config'> {
+  config?: GeneratorConfig;
+}
 
 /** Full pipeline: load a project, discover routes (call-sites + NestJS decorators), build the doc. */
 export function generate(
@@ -24,5 +27,8 @@ export function generate(
 
   inputs.push(...scanNestRoutes(project));
 
-  return buildOpenApi(inputs, info, options);
+  return buildOpenApi(inputs, info, {
+    ...options,
+    config: options.config ?? loadConfig(tsconfigPath),
+  });
 }

@@ -1,6 +1,7 @@
 import { STATUS_CODES } from 'node:http';
 import { createSchemaMapper } from './schema-mapper.js';
 import { jsDocText } from './jsdoc.js';
+import type { GeneratorConfig, SecurityRequirement } from './config.js';
 import type { ParamType, ResolvedRoute, RouteTypes } from './types.js';
 
 export interface RouteInput {
@@ -15,6 +16,7 @@ export interface ApiInfo {
 
 export interface BuildOptions {
   descriptions?: boolean;
+  config?: GeneratorConfig;
 }
 
 type Json = Record<string, unknown>;
@@ -43,6 +45,8 @@ export function buildOpenApi(
       if (docs.description) operation.description = docs.description;
       if (docs.deprecated) operation.deprecated = true;
     }
+    const security = operationSecurity(route, options.config);
+    if (security) operation.security = security;
     const parameters: Json[] = [];
 
     // A param without static type information documents as a string.
@@ -83,8 +87,48 @@ export function buildOpenApi(
   }
 
   const doc: Json = { openapi: '3.0.3', info, paths };
+  const components: Json = {};
   if (Object.keys(schemaMapper.components).length > 0) {
-    doc.components = { schemas: schemaMapper.components };
+    components.schemas = schemaMapper.components;
+  }
+  if (options.config?.securitySchemes) {
+    components.securitySchemes = options.config.securitySchemes;
+  }
+  if (Object.keys(components).length > 0) {
+    doc.components = components;
   }
   return doc;
+}
+
+function operationSecurity(
+  route: ResolvedRoute,
+  config: GeneratorConfig | undefined,
+): SecurityRequirement[] | undefined {
+  if (!config) return undefined;
+  if (isPublicRoute(route, config.publicDecorator)) return [];
+
+  const override = config.securityOverrides?.find((entry) => {
+    const methodMatches = !entry.method || entry.method.toLowerCase() === route.verb;
+    return methodMatches && globMatches(entry.path, route.path);
+  });
+  if (override) return override.security;
+
+  return config.security;
+}
+
+function isPublicRoute(route: ResolvedRoute, decoratorName = 'Public'): boolean {
+  return hasDecorator(route.method, decoratorName) || hasDecorator(route.method.getParent(), decoratorName);
+}
+
+function hasDecorator(node: unknown, decoratorName: string): boolean {
+  const decorators = (node as { getDecorators?: () => Array<{ getName(): string }> } | undefined)?.getDecorators?.();
+  return decorators?.some((decorator) => decorator.getName() === decoratorName) ?? false;
+}
+
+function globMatches(pattern: string, value: string): boolean {
+  const regex = pattern
+    .split('**')
+    .map((part) => part.replace(/[.+?^${}()|[\]\\]/g, '\\$&').replace(/\*/g, '[^/]*'))
+    .join('.*');
+  return new RegExp(`^${regex}$`).test(value);
 }

@@ -166,6 +166,31 @@ unwrapping `Promise<T>` to `T` when present.
   `summary`/`description`, `@deprecated` marks operations deprecated, and
   property JSDoc becomes schema property `description`.
 
+### Security config
+
+Add `ts-route-openapi.config.json` next to your `tsconfig.json` to emit
+OpenAPI security metadata:
+
+```json
+{
+  "securitySchemes": {
+    "bearerAuth": { "type": "http", "scheme": "bearer" },
+    "apiKeyAuth": { "type": "apiKey", "in": "header", "name": "x-api-key" }
+  },
+  "security": [{ "bearerAuth": [] }],
+  "securityOverrides": [
+    { "method": "GET", "path": "/health", "security": [] },
+    { "path": "/public/**", "security": [] }
+  ],
+  "publicDecorator": "Public"
+}
+```
+
+`securitySchemes` is copied to `components.securitySchemes`; `security` is
+applied to every operation unless a `securityOverrides` entry matches the route
+verb and glob path. For NestJS, `@Public()` on a class or method drops the
+default security when `publicDecorator` is set.
+
 ## Examples
 
 Runnable, idiomatic **Express**, **Fastify**, **NestJS**, **Hono**, **Koa**,

@@ -4,6 +4,7 @@ import { buildOpenApi } from './openapi-builder.js';
 import { resolveHandler } from './handler-resolver.js';
 import { scanRoutes } from './route-scanner.js';
 import { extractTypes } from './type-extractor.js';
+import { scanNestRoutes } from './nest-scanner.js';
 
 function inputsFrom(code: string) {
   const project = new Project({ useInMemoryFileSystem: true });
@@ -93,6 +94,63 @@ test('leaves documented routes unchanged when descriptions are disabled', () => 
   expect(op.summary).toBeUndefined();
   expect(op.deprecated).toBeUndefined();
   expect(doc.components.schemas.CreateInput.properties.name).toEqual({ type: 'string' });
+});
+
+test('adds configured security schemes, defaults and path-glob overrides', () => {
+  const doc = buildOpenApi(
+    inputsFrom(`
+      declare const app: any;
+      app.get('/health', () => ({ ok: true }));
+      app.get('/users/:id', (id: string) => ({ id }));
+    `),
+    undefined,
+    {
+      config: {
+        securitySchemes: {
+          bearerAuth: { type: 'http', scheme: 'bearer' },
+        },
+        security: [{ bearerAuth: [] }],
+        securityOverrides: [{ method: 'GET', path: '/health', security: [] }],
+      },
+    },
+  ) as any;
+
+  expect(doc.components.securitySchemes).toEqual({
+    bearerAuth: { type: 'http', scheme: 'bearer' },
+  });
+  expect(doc.paths['/health'].get.security).toEqual([]);
+  expect(doc.paths['/users/{id}'].get.security).toEqual([{ bearerAuth: [] }]);
+});
+
+test('drops default security for Nest methods with the configured public decorator', () => {
+  const project = new Project({ useInMemoryFileSystem: true });
+  project.createSourceFile(
+    'nest.ts',
+    `
+      function Controller(path?: string): ClassDecorator { return () => {}; }
+      function Get(path?: string): MethodDecorator { return () => {}; }
+      function Public(): MethodDecorator { return () => {}; }
+
+      @Controller('status')
+      class StatusController {
+        @Public()
+        @Get('health')
+        health(): { ok: boolean } {
+          return { ok: true };
+        }
+      }
+    `,
+  );
+
+  const doc = buildOpenApi(scanNestRoutes(project), undefined, {
+    config: {
+      securitySchemes: { bearerAuth: { type: 'http', scheme: 'bearer' } },
+      security: [{ bearerAuth: [] }],
+      publicDecorator: 'Public',
+    },
+  }) as any;
+
+  expect(doc.paths['/status/health'].get.security).toEqual([]);
 });
 
 test('keeps same-named components distinct across route inputs', () => {
