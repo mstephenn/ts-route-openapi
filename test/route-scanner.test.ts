@@ -1,15 +1,9 @@
-import { Project } from 'ts-morph';
 import { expect, test } from 'vitest';
-import { scanRoutes } from './route-scanner.js';
-
-function projectWith(code: string): Project {
-  const project = new Project({ useInMemoryFileSystem: true });
-  project.createSourceFile('bootstrap.ts', code);
-  return project;
-}
+import { scanRoutes } from '../src/route-scanner.js';
+import { createProjectWithSource } from './support/project.js';
 
 test('scanRoutes finds verb, path and handler expression', () => {
-  const project = projectWith(`
+  const project = createProjectWithSource(`
     declare const app: any;
     const UsersController = { getById(id: string) { return id; } };
     app.get('/users/:id', UsersController.getById);
@@ -26,7 +20,7 @@ test('scanRoutes finds verb, path and handler expression', () => {
 });
 
 test('scanRoutes accepts middleware between path and handler', () => {
-  const project = projectWith(`
+  const project = createProjectWithSource(`
     declare const app: any;
     declare const mw1: any;
     declare const mw2: any;
@@ -41,7 +35,7 @@ test('scanRoutes accepts middleware between path and handler', () => {
 });
 
 test('scanRoutes ignores non-route method calls and calls without a string path', () => {
-  const project = projectWith(`
+  const project = createProjectWithSource(`
     declare const app: any;
     app.listen(3000);
     app.get(someVar, () => {});

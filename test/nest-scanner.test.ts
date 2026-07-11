@@ -1,27 +1,23 @@
-import { Project } from 'ts-morph';
 import { expect, test } from 'vitest';
-import { scanNestRoutes } from './nest-scanner.js';
+import { scanNestRoutes } from '../src/nest-scanner.js';
+import { createProjectWithFiles } from './support/project.js';
 
-function projectWith(code: string): Project {
-  const project = new Project({
-    useInMemoryFileSystem: true,
-    compilerOptions: { experimentalDecorators: true },
-  });
-  project.createSourceFile(
-    'decorators.ts',
-    `
-    export function Controller(path?: string): ClassDecorator { return () => {}; }
-    export function Get(path?: string): MethodDecorator { return () => {}; }
-    export function Post(path?: string): MethodDecorator { return () => {}; }
-    export function Param(name?: string): ParameterDecorator { return () => {}; }
-    export function Query(name?: string): ParameterDecorator { return () => {}; }
-    export function Body(): ParameterDecorator { return () => {}; }
-    export function HttpCode(n: number): MethodDecorator { return () => {}; }
-    export function Delete(path?: string): MethodDecorator { return () => {}; }
-    `,
+const DECORATORS = `
+  export function Controller(path?: string): ClassDecorator { return () => {}; }
+  export function Get(path?: string): MethodDecorator { return () => {}; }
+  export function Post(path?: string): MethodDecorator { return () => {}; }
+  export function Param(name?: string): ParameterDecorator { return () => {}; }
+  export function Query(name?: string): ParameterDecorator { return () => {}; }
+  export function Body(): ParameterDecorator { return () => {}; }
+  export function HttpCode(n: number): MethodDecorator { return () => {}; }
+  export function Delete(path?: string): MethodDecorator { return () => {}; }
+`;
+
+function projectWith(code: string) {
+  return createProjectWithFiles(
+    { 'decorators.ts': DECORATORS, 'app.ts': code },
+    { compilerOptions: { experimentalDecorators: true } },
   );
-  project.createSourceFile('app.ts', code);
-  return project;
 }
 
 test('scans @Controller classes and extracts decorated params', () => {

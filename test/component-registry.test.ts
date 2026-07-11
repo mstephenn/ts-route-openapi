@@ -1,18 +1,13 @@
-import { Project, type Type } from 'ts-morph';
 import { expect, test, vi } from 'vitest';
-import { createComponentRegistry } from './component-registry.js';
-
-function typesOf(source: string, ...names: string[]): Type[] {
-  const project = new Project({ useInMemoryFileSystem: true });
-  const sf = project.createSourceFile('t.ts', source);
-  return names.map((n) => sf.getVariableDeclarationOrThrow(n).getType());
-}
+import { createComponentRegistry } from '../src/component-registry.js';
+import { createProjectWithFiles } from './support/project.js';
+import { typesOfDeclarations } from './support/types.js';
 
 test('resolveRef assigns a stable name and only computes the schema once', () => {
   const registry = createComponentRegistry();
-  const [type] = typesOf(
+  const [type] = typesOfDeclarations(
     `interface User { id: string } declare const value: User;`,
-    'value',
+    ['value'],
   );
   const compute = vi.fn(() => ({ type: 'object', properties: {} }));
 
@@ -27,16 +22,15 @@ test('resolveRef assigns a stable name and only computes the schema once', () =>
 
 test('resolveRef disambiguates and warns when two distinct types share a base name', () => {
   const registry = createComponentRegistry();
-  const project = new Project({ useInMemoryFileSystem: true });
-  project.createSourceFile('/public.ts', `export interface User { a: string }`);
-  project.createSourceFile('/admin.ts', `export interface User { b: number }`);
-  const sf = project.createSourceFile(
-    '/t.ts',
-    `import type { User as AUser } from './public';
+  const project = createProjectWithFiles({
+    '/public.ts': `export interface User { a: string }`,
+    '/admin.ts': `export interface User { b: number }`,
+    '/t.ts': `import type { User as AUser } from './public';
      import type { User as BUser } from './admin';
      declare const a: AUser;
      declare const b: BUser;`,
-  );
+  });
+  const sf = project.getSourceFileOrThrow('/t.ts');
   const aType = sf.getVariableDeclarationOrThrow('a').getType();
   const bType = sf.getVariableDeclarationOrThrow('b').getType();
   const warn = vi.spyOn(console, 'warn').mockImplementation(() => undefined);

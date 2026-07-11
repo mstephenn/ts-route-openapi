@@ -3,7 +3,7 @@ import { tmpdir } from 'node:os';
 import { fileURLToPath } from 'node:url';
 import { dirname, join } from 'node:path';
 import { expect, test } from 'vitest';
-import { generate } from './generate.js';
+import { generate } from '../src/generate.js';
 
 const here = dirname(fileURLToPath(import.meta.url));
 const sampleDir = join(here, '__fixtures__', 'sample');

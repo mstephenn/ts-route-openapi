@@ -1,13 +1,9 @@
-import { Project } from 'ts-morph';
 import { expect, test } from 'vitest';
-import { resolveHandler } from './handler-resolver.js';
-import { scanRoutes } from './route-scanner.js';
-import { extractTypes } from './type-extractor.js';
+import { extractTypes } from '../src/type-extractor.js';
+import { createProjectWithSource, scanResolvedRoutes } from './support/project.js';
 
 function route(code: string) {
-  const project = new Project({ useInMemoryFileSystem: true });
-  project.createSourceFile('bootstrap.ts', code);
-  return resolveHandler(scanRoutes(project)[0])!;
+  return scanResolvedRoutes(createProjectWithSource(code))[0];
 }
 
 test('classifies path params, body, query and unwraps Promise response', () => {
