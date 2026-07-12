@@ -1,5 +1,6 @@
 import { Node, SyntaxKind, type Expression, type Node as MorphNode } from 'ts-morph';
 import type { ParamType, Schema } from './types.js';
+import { createWarnOnce } from './warn-once.js';
 
 export interface ValidatorSchemas {
   bodySchema?: Schema;
@@ -12,7 +13,7 @@ interface ZodResult {
   optional: boolean;
 }
 
-const warnedUnsupportedZod = new Set<string>();
+const warnOnce = createWarnOnce();
 
 export function extractValidatorSchemas(expressions: MorphNode[]): ValidatorSchemas {
   const result: ValidatorSchemas = {};
@@ -265,7 +266,5 @@ function isSchema(value: unknown): value is Schema {
 
 function warnUnsupportedZod(node: MorphNode | undefined): void {
   const text = node?.getText().slice(0, 80) ?? '(missing schema)';
-  if (warnedUnsupportedZod.has(text)) return;
-  warnedUnsupportedZod.add(text);
-  console.warn(`ts-route-openapi: unsupported Zod schema construct; emitted {} for ${text}`);
+  warnOnce(text, `ts-route-openapi: unsupported Zod schema construct; emitted {} for ${text}`);
 }
