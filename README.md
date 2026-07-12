@@ -217,7 +217,7 @@ resolved before merging.
 
 See [`CONTRIBUTING.md`](./CONTRIBUTING.md) for the full workflow.
 
-## Limitations (MVP scope)
+## Limitations
 
 - **Status codes are detected, not exhaustive**: `res.status(N)` /
   `reply.code(N)` / `@HttpCode(N)` produce per-status responses, but
