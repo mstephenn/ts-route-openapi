@@ -102,8 +102,8 @@ const doc = generate(
 
 ## How it works
 
-The tool loads your project via its `tsconfig.json` and discovers routes two
-ways:
+The tool loads your project via its `tsconfig.json` and discovers routes
+three ways:
 
 1. **Registration call-sites** — any call of the shape
    `something.<verb>('/path', handler)` where `<verb>` is one of `get`,

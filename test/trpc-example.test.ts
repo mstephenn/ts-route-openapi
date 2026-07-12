@@ -10,6 +10,11 @@ import { createProjectWithSource } from './support/project.js';
 const here = dirname(fileURLToPath(import.meta.url));
 const exampleDir = join(here, '..', 'examples', 'trpc');
 
+// Task 0.1.16's acceptance criteria specifically required this example's spec
+// to be test-covered; the other example apps (express/fastify/nest/hono/koa)
+// have no equivalent test and are verified only by the README's manual
+// instructions — this isn't a precedent for adding tests to those too.
+//
 // Analyzed as an in-memory source file (not via the example's own node_modules
 // install) so this test doesn't depend on `examples/trpc` having been `npm
 // install`ed — every other example app is likewise never installed by the

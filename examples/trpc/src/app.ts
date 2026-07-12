@@ -49,5 +49,7 @@ const appRouter = router({
 
 export type AppRouter = typeof appRouter;
 
-createHTTPServer({ router: appRouter }).listen(3000);
+// basePath must match the generator's default `trpc.basePath` ('/trpc') so the
+// documented paths (/trpc/orders.getById, /trpc/orders.create) actually exist.
+createHTTPServer({ router: appRouter, basePath: '/trpc/' }).listen(3000);
 console.log('tRPC example on http://localhost:3000');

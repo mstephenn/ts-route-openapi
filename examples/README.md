@@ -40,6 +40,11 @@ curl -X POST localhost:3000/trpc/orders.create \
 curl 'localhost:3000/trpc/orders.getById?input=%7B%22id%22%3A%22o1%22%7D'
 ```
 
+**Known limitation:** tRPC's HTTP adapter wraps every response in a
+`{"result":{"data": ...}}` envelope; the generated spec documents the payload
+schema directly (unwrapped), since modeling the envelope isn't implemented
+yet.
+
 ## How much detail you get depends on the framework
 
 The tool reads whatever static type information the framework's idioms carry:
