@@ -100,6 +100,20 @@ test('describes a method-shorthand property the same way as an arrow-typed one',
   });
 });
 
+test('a callable property typed by a named function type alias describes the expanded signature, not the alias name', () => {
+  const [type] = typesOfDeclarations(
+    `type Handler = (id: string) => void;
+     declare const value: { onSave: Handler };`,
+    ['value'],
+  );
+
+  const result = mapType(type);
+
+  expect(result.schema.properties).toEqual({
+    onSave: { description: 'Function: (id: string) => void' },
+  });
+});
+
 test('a JSDoc comment on a callable property wins over the auto-generated signature description', () => {
   const result = mapType(
     typeOf(`{
