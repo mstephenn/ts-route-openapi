@@ -1,5 +1,5 @@
 import type { ParameterDeclaration } from 'ts-morph';
-import { tryFrameworkExtractors, tokenParams, pathTokens } from '../routes/index.js';
+import { tryFrameworkExtractors, tokenParams, pathTokens, withThrownStatuses } from '../routes/index.js';
 import type { ParamType, ResolvedRoute, RouteTypes } from '../shared/index.js';
 import { extractValidatorSchemas } from './validator-schemas.js';
 
@@ -20,12 +20,13 @@ import { extractValidatorSchemas } from './validator-schemas.js';
 export function extractTypes(route: ResolvedRoute): RouteTypes {
   const params = route.method.getParameters();
   const validators = extractValidatorSchemas(route.middlewareExpressions);
+  const finalize = (types: RouteTypes) => finalizeTypes(types, route, validators);
 
   const framework = tryFrameworkExtractors(route, params);
-  if (framework) return mergeValidatorTypes(framework, validators);
+  if (framework) return finalize(framework);
 
   if (isFrameworkLike(params[0])) {
-    return mergeValidatorTypes({ pathParams: tokenParams(route), query: [] }, validators);
+    return finalize({ pathParams: tokenParams(route), query: [] });
   }
 
   const tokens = pathTokens(route.path);
@@ -59,11 +60,12 @@ export function extractTypes(route: ResolvedRoute): RouteTypes {
     if (args.length === 1) response = args[0];
   }
 
-  return mergeValidatorTypes({ pathParams, query, body, response }, validators);
+  return finalize({ pathParams, query, body, response });
 }
 
-function mergeValidatorTypes(
+function finalizeTypes(
   types: RouteTypes,
+  route: ResolvedRoute,
   validators: ReturnType<typeof extractValidatorSchemas>,
 ): RouteTypes {
   return {
@@ -71,6 +73,7 @@ function mergeValidatorTypes(
     pathParams: validators.pathParams ?? types.pathParams,
     query: validators.query ?? types.query,
     bodySchema: validators.bodySchema ?? types.bodySchema,
+    responses: withThrownStatuses(types, route.method),
   };
 }
 

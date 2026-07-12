@@ -106,6 +106,68 @@ test('express: enum/const status arguments resolve via the type checker', () => 
   expect(types.responses?.map((r) => r.status)).toEqual([201, 404]);
 });
 
+test('a thrown local exception class with a status property adds a schema-less response', () => {
+  const [route] = routesFrom(`
+    ${EXPRESS_DECLS}
+    interface Order { id: string }
+    class NotFoundError extends Error {
+      status = 404;
+    }
+    declare const app: any;
+    app.get('/orders/:id', (req: Request<{ id: string }>, res: Response<Order>) => {
+      if (Math.random() > 1) throw new NotFoundError();
+      res.json({ id: 'x' } as Order);
+    });
+  `);
+  const types = extractTypes(route);
+
+  expect(types.responses?.map((r) => [r.status, r.type?.getText()])).toEqual([
+    [200, 'Order'],
+    [404, undefined],
+  ]);
+});
+
+test('a thrown exception class inherits its status from a local base class', () => {
+  const [route] = routesFrom(`
+    ${EXPRESS_DECLS}
+    interface Order { id: string }
+    class HttpError extends Error {
+      statusCode = 500;
+    }
+    class ConflictError extends HttpError {
+      statusCode = 409;
+    }
+    declare const app: any;
+    app.post('/orders', (req: Request, res: Response<Order>) => {
+      if (Math.random() > 1) throw new ConflictError();
+      res.json({ id: 'x' } as Order);
+    });
+  `);
+  const types = extractTypes(route);
+
+  expect(types.responses?.map((r) => r.status)).toEqual([200, 409]);
+});
+
+test('a file-scoped Express error-handling middleware adds its statuses to every route in the file', () => {
+  const [route] = routesFrom(`
+    ${EXPRESS_DECLS}
+    interface Order { id: string }
+    declare const app: any;
+    app.use((err: unknown, req: Request, res: Response, next: () => void) => {
+      res.status(500).json({ message: 'boom' });
+    });
+    app.get('/orders/:id', (req: Request<{ id: string }>, res: Response<Order>) => {
+      res.json({ id: 'x' } as Order);
+    });
+  `);
+  const types = extractTypes(route);
+
+  expect(types.responses?.map((r) => [r.status, r.type?.getText()])).toEqual([
+    [200, 'Order'],
+    [500, undefined],
+  ]);
+});
+
 test('a shadowed param in a nested closure is not misattributed for either express or fastify', () => {
   const [expressRoute] = routesFrom(`
     ${EXPRESS_DECLS}

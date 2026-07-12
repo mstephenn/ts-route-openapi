@@ -95,6 +95,26 @@ test('nest: POST defaults to 201 and @HttpCode overrides', () => {
   expect(byPathVerb['get /things'].responses).toBeUndefined();
 });
 
+test('nest: a thrown built-in HttpException subclass adds a schema-less response', () => {
+  const project = projectWith(`
+    import { Controller, Get, Param } from './decorators.js';
+
+    class NotFoundException extends Error {}
+
+    @Controller('things')
+    class ThingsController {
+      @Get(':id')
+      getById(@Param('id') id: string): { name: string } {
+        if (id === 'missing') throw new NotFoundException('not found');
+        return { name: 'x' };
+      }
+    }
+  `);
+
+  const routes = scanNestRoutes(project);
+  expect(routes[0].types.responses?.map((x) => x.status)).toEqual([200, 404]);
+});
+
 test('nest: @HttpCode(HttpStatus.NO_CONTENT) enum member resolves, and 204 responses drop the body', () => {
   const project = projectWith(`
     import { Controller, Delete, Param, HttpCode } from './decorators.js';

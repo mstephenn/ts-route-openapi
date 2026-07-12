@@ -1,5 +1,12 @@
 import { Node, type Decorator, type MethodDeclaration, type Project } from 'ts-morph';
-import { objectParams, unwrapPromise, usableObject, usableResponse, literalStatus } from './frameworks/index.js';
+import {
+  objectParams,
+  unwrapPromise,
+  usableObject,
+  usableResponse,
+  literalStatus,
+  withThrownStatuses,
+} from './frameworks/index.js';
 import { joinPaths } from './route-paths.js';
 import { syntheticRoute } from './synthetic-route.js';
 import type { HttpVerb, ParamType, ResolvedRoute, RouteTypes } from '../shared/index.js';
@@ -100,12 +107,13 @@ function extractNestTypes(method: MethodDeclaration, verb: HttpVerb): RouteTypes
 
   const response = usableResponse(unwrapPromise(method.getReturnType()));
   const status = nestStatus(method, verb);
-
-  return {
+  const types: RouteTypes = {
     pathParams,
     query,
     body,
     response,
     responses: status !== 200 ? [{ status, type: response }] : undefined,
   };
+
+  return { ...types, responses: withThrownStatuses(types, method) };
 }
