@@ -164,6 +164,11 @@ unwrapping `Promise<T>` to `T` when present.
   unions become `oneOf` over `$ref`s). `null`/`undefined` members are
   stripped.
 - `Date` maps to `{ type: string, format: date-time }`.
+- Callable-typed properties (functions, methods) map to
+  `{ description: 'Function: <signature text>' }` instead of an empty
+  schema — e.g. `onSave: (id: string) => void` becomes
+  `{ description: 'Function: (id: string) => void' }`. A property's own
+  JSDoc (when `--descriptions` is enabled) overrides the signature text.
 - Named `interface`/`class`/`type` alias declarations from your project are
   hoisted into `components.schemas` and referenced via `$ref` (recursive
   types self-reference); library/`node_modules` types are inlined.
@@ -229,8 +234,10 @@ See [`CONTRIBUTING.md`](./CONTRIBUTING.md) for the full workflow.
   same file. Statuses set any other way — resolved dynamically, thrown
   from a re-exported third-party exception class, or set by middleware
   registered in a different file than the routes it guards — are not seen.
-- **Callable types** (functions, methods) map to an empty schema (`{}`)
-  rather than being described.
+- **Callable types** (functions, methods) map to a schema-less
+  `{ description: 'Function: <signature text>' }` (overridden by the
+  property's own JSDoc when present) rather than being hoisted like an
+  object type. Overloaded signatures only describe the first overload.
 
 ## License
 

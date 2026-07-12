@@ -109,8 +109,8 @@ function toSchema(type: Type, context: SchemaContext): Schema {
     }
 
     // Callable types (functions, arrow types, etc.) have no meaningful OpenAPI
-    // representation; skip them rather than hoisting their method signatures.
-    if (type.getCallSignatures().length > 0) return {};
+    // shape to hoist; describe the signature instead of emitting an empty schema.
+    if (type.getCallSignatures().length > 0) return { description: `Function: ${type.getText()}` };
 
     // Hoist under a project-source name: the alias name (`type User = {...}`)
     // wins over the structural symbol name (interface/class).
