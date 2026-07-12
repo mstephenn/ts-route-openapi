@@ -2,6 +2,7 @@ import type { ParameterDeclaration } from 'ts-morph';
 import type { ResolvedRoute, RouteTypes } from '../../shared/index.js';
 import { objectParams, tokenParams, typeName, usableObject, usableResponse } from './shared.js';
 import { expressStatusResponses } from './status-calls.js';
+import { expressErrorMiddlewareStatuses, mergeResponses } from './thrown-status.js';
 
 /**
  * Express: `(req: Request<Params, ResBody, ReqBody, Query>, res: Response<ResBody>)`.
@@ -24,12 +25,17 @@ export function extractExpress(
 
   const response = usableResponse(resArg) ?? usableResponse(args[1]);
   const responses = res ? expressStatusResponses(route.method, res, response) : [];
+  const middlewareStatuses = res ? expressErrorMiddlewareStatuses(route.method.getSourceFile()) : [];
+  const merged =
+    middlewareStatuses.length > 0
+      ? mergeResponses(responses.length > 0 ? responses : [{ status: 200, type: response }], middlewareStatuses)
+      : responses;
 
   return {
     pathParams: objectParams(args[0], req) ?? tokenParams(route),
     query: objectParams(args[3], req) ?? [],
     body: usableObject(args[2]),
     response,
-    responses: responses.length > 0 ? responses : undefined,
+    responses: merged.length > 0 ? merged : undefined,
   };
 }

@@ -26,3 +26,4 @@ export function tryFrameworkExtractors(
 
 export * from './shared.js';
 export * from './status-calls.js';
+export * from './thrown-status.js';

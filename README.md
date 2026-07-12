@@ -220,9 +220,15 @@ See [`CONTRIBUTING.md`](./CONTRIBUTING.md) for the full workflow.
 ## Limitations
 
 - **Status codes are detected, not exhaustive**: `res.status(N)` /
-  `reply.code(N)` / `@HttpCode(N)` produce per-status responses, but
-  statuses set by middleware, error filters, or thrown exceptions are not
-  seen. No auth documentation yet.
+  `reply.code(N)` / `@HttpCode(N)` produce per-status responses. `throw new
+  X(...)` is also detected when `X` is a NestJS built-in `HttpException`
+  subclass (by name), a generic `HttpException(_, status)`, or a local
+  class whose own or inherited `status`/`statusCode` property is a numeric
+  literal. Express's `app.use((err, req, res, next) => ...)` error-handling
+  middleware contributes its `res.status(N)` calls to every route in the
+  same file. Statuses set any other way — resolved dynamically, thrown
+  from a re-exported third-party exception class, or set by middleware
+  registered in a different file than the routes it guards — are not seen.
 - **Callable types** (functions, methods) map to an empty schema (`{}`)
   rather than being described.
 
