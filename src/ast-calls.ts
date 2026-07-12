@@ -24,15 +24,13 @@ export function methodCallsIn(root: Node, methodNames: Set<string>): MethodCall[
   return calls;
 }
 
-/** Every call in `call`'s own receiver chain, outermost first (e.g. `.query()`, then `.output()`, then `.input()`). */
-export function callChain(call: CallExpression): CallExpression[] {
-  const calls: CallExpression[] = [];
-  let current: Node = call;
-  while (Node.isCallExpression(current)) {
-    calls.push(current);
-    const info = methodCallInfo(current);
-    if (!info) break;
-    current = info.receiver;
+/** Every method call in `call`'s own receiver chain, outermost first (e.g. `.query()`, then `.output()`, then `.input()`). */
+export function callChain(call: CallExpression): MethodCall[] {
+  const calls: MethodCall[] = [];
+  let info = methodCallInfo(call);
+  while (info) {
+    calls.push(info);
+    info = methodCallInfo(info.receiver);
   }
   return calls;
 }
