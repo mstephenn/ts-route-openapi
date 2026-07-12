@@ -34,3 +34,11 @@ export function callChain(call: CallExpression): MethodCall[] {
   }
   return calls;
 }
+
+/** Follow an `Identifier` to its variable declaration's initializer, if any. */
+export function resolveIdentifierInitializer(node: Node): Node | undefined {
+  if (!Node.isIdentifier(node)) return undefined;
+  const declaration = node.getSymbol()?.getDeclarations()[0];
+  if (!declaration || !Node.isVariableDeclaration(declaration)) return undefined;
+  return declaration.getInitializer();
+}

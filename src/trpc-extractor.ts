@@ -1,5 +1,5 @@
 import { Node, type CallExpression, type FunctionLikeDeclaration, type Type } from 'ts-morph';
-import { callChain } from './ast-calls.js';
+import { callChain, resolveIdentifierInitializer } from './ast-calls.js';
 import { unwrapPromise } from './frameworks/shared.js';
 import { schemaFromZodExpression } from './validator-schemas.js';
 import type { TrpcProcedure } from './trpc-scanner.js';
@@ -27,15 +27,14 @@ export function resolverFunction(resolver: Node): FunctionLikeDeclaration | unde
   if (Node.isFunctionLikeDeclaration(resolver)) return resolver;
 
   if (Node.isIdentifier(resolver)) {
+    // A bare `function foo() {}` reference: the declaration itself is the function.
     const declaration = resolver.getSymbol()?.getDeclarations()[0];
     if (Node.isFunctionLikeDeclaration(declaration)) return declaration;
-    if (declaration && Node.isVariableDeclaration(declaration)) {
-      const initializer = declaration.getInitializer();
-      if (Node.isFunctionLikeDeclaration(initializer)) return initializer;
-    }
   }
 
-  return undefined;
+  // A `const foo = () => {}` reference: resolve through the variable's initializer.
+  const initializer = resolveIdentifierInitializer(resolver);
+  return Node.isFunctionLikeDeclaration(initializer) ? initializer : undefined;
 }
 
 /** Extract a tRPC procedure's `.input()`/`.output()` schemas and (Promise-unwrapped) resolver return type. */

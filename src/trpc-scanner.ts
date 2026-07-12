@@ -1,5 +1,5 @@
 import { Node, type CallExpression, type Project } from 'ts-morph';
-import { methodCallInfo } from './ast-calls.js';
+import { methodCallInfo, resolveIdentifierInitializer } from './ast-calls.js';
 
 export interface TrpcProcedure {
   /** Dotted procedure path, e.g. `users.getById`. */
@@ -49,23 +49,12 @@ function routerProperties(call: CallExpression): { name: string; value: Node }[]
   return entries;
 }
 
-/** Follow an identifier to its variable declaration's initializer (e.g. a shorthand `{ health }` reference). */
-function resolveIdentifierInitializer(value: Node): Node {
-  if (!Node.isIdentifier(value)) return value;
-  const declaration = value.getSymbol()?.getDeclarations()[0];
-  if (declaration && Node.isVariableDeclaration(declaration)) {
-    const initializer = declaration.getInitializer();
-    if (initializer) return initializer;
-  }
-  return value;
-}
-
 /** Resolve a property value to the router call it names, whether inline or via a variable reference. */
 function resolveRouterCall(value: Node, cache: Map<Node, CallExpression | undefined>): CallExpression | undefined {
   const cached = cache.get(value);
   if (cached !== undefined || cache.has(value)) return cached;
 
-  const resolvedValue = resolveIdentifierInitializer(value);
+  const resolvedValue = resolveIdentifierInitializer(value) ?? value;
   const resolved = isRouterCall(resolvedValue) ? resolvedValue : undefined;
 
   cache.set(value, resolved);
@@ -114,7 +103,7 @@ function proceduresFromRouter(
       continue;
     }
 
-    const procedure = procedureFromChain(resolveIdentifierInitializer(value), path);
+    const procedure = procedureFromChain(resolveIdentifierInitializer(value) ?? value, path);
     if (procedure) procedures.push(procedure);
   }
 
