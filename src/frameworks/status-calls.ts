@@ -1,4 +1,5 @@
-import { Node, type CallExpression, type ParameterDeclaration, type Type } from 'ts-morph';
+import { Node, type ParameterDeclaration, type Type } from 'ts-morph';
+import { methodCallInfo, methodCallsIn } from '../ast-calls.js';
 import type { ResponseType, RouteHandler } from '../types.js';
 
 /**
@@ -17,33 +18,6 @@ function refersToParam(receiver: Node, param: ParameterDeclaration): boolean {
   return receiver.getSymbol()?.getDeclarations()[0] === param;
 }
 
-interface ParamMethodCall {
-  node: CallExpression;
-  method: string;
-  receiver: Node;
-}
-
-/**
- * Walk a handler body for call expressions shaped `<receiver>.<method>(...)`
- * where `method` is one of `methodNames` — the traversal both Express's and
- * Fastify's response-status scanning share before diverging on how they
- * interpret the receiver/status.
- */
-function paramMethodCalls(handler: RouteHandler, methodNames: Set<string>): ParamMethodCall[] {
-  const calls: ParamMethodCall[] = [];
-
-  handler.forEachDescendant((node) => {
-    if (!Node.isCallExpression(node)) return;
-    const callee = node.getExpression();
-    if (!Node.isPropertyAccessExpression(callee)) return;
-    const method = callee.getName();
-    if (!methodNames.has(method)) return;
-    calls.push({ node, method, receiver: callee.getExpression() });
-  });
-
-  return calls;
-}
-
 const EXPRESS_RESPONSE_METHODS = new Set(['json', 'send', 'end']);
 const FASTIFY_STATUS_METHODS = new Set(['code', 'status']);
 
@@ -60,14 +34,14 @@ export function expressStatusResponses(
 ): ResponseType[] {
   const found = new Map<number, Type | undefined>();
 
-  for (const { node, method, receiver } of paramMethodCalls(handler, EXPRESS_RESPONSE_METHODS)) {
+  for (const { node, method, receiver } of methodCallsIn(handler, EXPRESS_RESPONSE_METHODS)) {
     let status = 200;
     if (Node.isCallExpression(receiver)) {
       // res.status(N).json(...)
-      const inner = receiver.getExpression();
-      if (!Node.isPropertyAccessExpression(inner) || inner.getName() !== 'status') continue;
-      if (!refersToParam(inner.getExpression(), resParam)) continue;
-      const resolved = literalStatus(receiver.getArguments()[0]);
+      const inner = methodCallInfo(receiver);
+      if (!inner || inner.method !== 'status') continue;
+      if (!refersToParam(inner.receiver, resParam)) continue;
+      const resolved = literalStatus(inner.node.getArguments()[0]);
       if (resolved === undefined) continue;
       status = resolved;
     } else if (!refersToParam(receiver, resParam)) {
@@ -99,7 +73,7 @@ export function fastifyStatusResponses(
   const codes = new Set<number>();
 
   if (replyParam) {
-    for (const { node, receiver } of paramMethodCalls(handler, FASTIFY_STATUS_METHODS)) {
+    for (const { node, receiver } of methodCallsIn(handler, FASTIFY_STATUS_METHODS)) {
       if (!refersToParam(receiver, replyParam)) continue;
       const resolved = literalStatus(node.getArguments()[0]);
       if (resolved !== undefined) codes.add(resolved);

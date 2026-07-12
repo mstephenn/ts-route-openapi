@@ -1,4 +1,5 @@
 import { Node, type Project } from 'ts-morph';
+import { methodCallsIn } from './ast-calls.js';
 import type { HttpVerb, RouteBinding } from './types.js';
 
 const DEFAULT_VERBS: HttpVerb[] = ['get', 'post', 'put', 'patch', 'delete'];
@@ -13,26 +14,21 @@ export function scanRoutes(project: Project, verbs: HttpVerb[] = DEFAULT_VERBS):
   const bindings: RouteBinding[] = [];
 
   for (const sourceFile of project.getSourceFiles()) {
-    sourceFile.forEachDescendant((node) => {
-      if (!Node.isCallExpression(node)) return;
-      const callee = node.getExpression();
-      if (!Node.isPropertyAccessExpression(callee)) return;
-      if (!verbSet.has(callee.getName())) return;
-
+    for (const { node, method } of methodCallsIn(sourceFile, verbSet)) {
       const args = node.getArguments();
-      if (args.length < 2) return;
+      if (args.length < 2) continue;
       const pathArg = args[0];
-      if (!Node.isStringLiteral(pathArg)) return;
+      if (!Node.isStringLiteral(pathArg)) continue;
       const handlerIndex = lastHandlerIndex(args);
-      if (handlerIndex < 1) return;
+      if (handlerIndex < 1) continue;
 
       bindings.push({
-        verb: callee.getName() as HttpVerb,
+        verb: method as HttpVerb,
         path: pathArg.getLiteralValue(),
         handlerExpression: args[handlerIndex],
         middlewareExpressions: args.slice(1, handlerIndex),
       });
-    });
+    }
   }
 
   return bindings;
