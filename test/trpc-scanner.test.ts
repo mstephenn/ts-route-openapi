@@ -1,5 +1,5 @@
 import { expect, test } from 'vitest';
-import { scanTrpcRouters } from '../src/trpc-scanner.js';
+import { scanTrpcRouters } from '../src/trpc/index.js';
 import { createProjectWithSource } from './support/project.js';
 import { TRPC_STUBS as STUBS } from './support/trpc.js';
 

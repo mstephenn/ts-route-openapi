@@ -1,6 +1,6 @@
 import { Node } from 'ts-morph';
-import { resolveIdentifierDeclaration } from './ast-helpers.js';
-import type { ResolvedRoute, RouteBinding } from './types.js';
+import { resolveIdentifierDeclaration } from '../shared/index.js';
+import type { ResolvedRoute, RouteBinding } from '../shared/index.js';
 
 /**
  * Resolve a binding's handler expression to the function-like declaration it

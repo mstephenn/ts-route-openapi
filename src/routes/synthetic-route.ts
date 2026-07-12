@@ -1,4 +1,4 @@
-import type { ResolvedRoute } from './types.js';
+import type { ResolvedRoute } from '../shared/index.js';
 
 /**
  * Build a `ResolvedRoute` for a synthetic (non-call-site) route source — a

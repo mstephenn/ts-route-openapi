@@ -1,8 +1,8 @@
 import { expect, test, vi } from 'vitest';
-import { buildOpenApi } from '../src/openapi-builder.js';
-import { extractTypes } from '../src/type-extractor.js';
-import { scanNestRoutes } from '../src/nest-scanner.js';
-import type { ResolvedRoute } from '../src/types.js';
+import { buildOpenApi } from '../src/openapi/index.js';
+import { extractTypes } from '../src/schema/index.js';
+import { scanNestRoutes } from '../src/routes/index.js';
+import type { ResolvedRoute } from '../src/shared/index.js';
 import { createProjectWithSource, scanResolvedRoutes } from './support/project.js';
 import { typesOfDeclarationsIn } from './support/types.js';
 import { getOperation, schemaProperties } from './support/openapi.js';

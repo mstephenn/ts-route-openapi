@@ -1,5 +1,5 @@
 import { expect, test, vi } from 'vitest';
-import { createComponentRegistry } from '../src/component-registry.js';
+import { createComponentRegistry } from '../src/schema/index.js';
 import { typesOfDeclarations, typesOfDeclarationsIn } from './support/types.js';
 
 test('resolveRef assigns a stable name and only computes the schema once', () => {

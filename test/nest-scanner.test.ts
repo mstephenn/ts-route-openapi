@@ -1,5 +1,5 @@
 import { expect, test } from 'vitest';
-import { scanNestRoutes } from '../src/nest-scanner.js';
+import { scanNestRoutes } from '../src/routes/index.js';
 import { createProjectWithFiles } from './support/project.js';
 
 const DECORATORS = `

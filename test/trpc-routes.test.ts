@@ -1,6 +1,6 @@
 import { expect, test } from 'vitest';
-import { buildOpenApi } from '../src/openapi-builder.js';
-import { scanTrpcRoutes } from '../src/trpc-routes.js';
+import { buildOpenApi } from '../src/openapi/index.js';
+import { scanTrpcRoutes } from '../src/trpc/index.js';
 import { getOperation } from './support/openapi.js';
 import { createProjectWithSource } from './support/project.js';
 import { TRPC_STUBS as STUBS } from './support/trpc.js';

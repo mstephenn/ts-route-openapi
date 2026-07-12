@@ -1,10 +1,9 @@
 import type { Project } from 'ts-morph';
-import type { RouteInput } from './openapi-builder.js';
-import { joinPaths } from './route-paths.js';
-import { syntheticRoute } from './synthetic-route.js';
+import type { RouteInput } from '../openapi/index.js';
+import { joinPaths, syntheticRoute } from '../routes/index.js';
 import { extractTrpcProcedureIO } from './trpc-extractor.js';
 import { scanTrpcRouters, type TrpcProcedure } from './trpc-scanner.js';
-import type { RouteHandler, RouteTypes } from './types.js';
+import type { RouteHandler, RouteTypes } from '../shared/index.js';
 
 export interface TrpcRouteOptions {
   /** Prefix every procedure path with this base path. @default '/trpc' */

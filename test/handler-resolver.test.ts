@@ -1,7 +1,7 @@
 import { Node } from 'ts-morph';
 import { expect, test } from 'vitest';
-import { resolveHandler } from '../src/handler-resolver.js';
-import { scanRoutes } from '../src/route-scanner.js';
+import { resolveHandler } from '../src/routes/index.js';
+import { scanRoutes } from '../src/routes/index.js';
 import { createProjectWithSource } from './support/project.js';
 
 function firstBinding(code: string) {

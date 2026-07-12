@@ -3,8 +3,8 @@ import { fileURLToPath } from 'node:url';
 import { dirname, join } from 'node:path';
 import { parse } from 'yaml';
 import { expect, test } from 'vitest';
-import { buildOpenApi } from '../src/openapi-builder.js';
-import { scanTrpcRoutes } from '../src/trpc-routes.js';
+import { buildOpenApi } from '../src/openapi/index.js';
+import { scanTrpcRoutes } from '../src/trpc/index.js';
 import { createProjectWithSource } from './support/project.js';
 
 const here = dirname(fileURLToPath(import.meta.url));

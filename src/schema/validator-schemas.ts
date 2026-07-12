@@ -1,7 +1,11 @@
 import { Node, SyntaxKind, type Expression, type Node as MorphNode } from 'ts-morph';
-import { methodCallInfo, resolveIdentifierInitializer } from './ast-helpers.js';
-import type { ParamType, Schema } from './types.js';
-import { createWarnOnce } from './warn-once.js';
+import {
+  methodCallInfo,
+  resolveIdentifierInitializer,
+  createWarnOnce,
+  type ParamType,
+  type Schema,
+} from '../shared/index.js';
 
 export interface ValidatorSchemas {
   bodySchema?: Schema;

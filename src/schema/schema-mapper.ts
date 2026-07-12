@@ -1,5 +1,5 @@
 import { Node, type Type } from 'ts-morph';
-import { jsDocText } from './jsdoc.js';
+import { jsDocText } from '../shared/index.js';
 import { createComponentRegistry, typeId, type ComponentRegistry } from './component-registry.js';
 
 type Schema = Record<string, unknown>;

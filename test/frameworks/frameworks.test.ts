@@ -1,5 +1,5 @@
 import { expect, test } from 'vitest';
-import { extractTypes } from '../../src/type-extractor.js';
+import { extractTypes } from '../../src/schema/index.js';
 import { createProjectWithFiles, scanResolvedRoutes } from '../support/project.js';
 
 function routesFrom(files: Record<string, string>) {

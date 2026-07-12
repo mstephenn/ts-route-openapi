@@ -1,8 +1,8 @@
 import { STATUS_CODES } from 'node:http';
-import { createSchemaMapper } from './schema-mapper.js';
-import { jsDocText } from './jsdoc.js';
-import type { GeneratorConfig, SecurityRequirement } from './config.js';
-import type { ParamType, ResolvedRoute, RouteTypes } from './types.js';
+import { createSchemaMapper } from '../schema/index.js';
+import { jsDocText } from '../shared/index.js';
+import type { GeneratorConfig, SecurityRequirement } from '../config.js';
+import type { ParamType, ResolvedRoute, RouteTypes } from '../shared/index.js';
 import type {
   ApiInfo,
   ComponentsObject,
@@ -13,8 +13,6 @@ import type {
   ResponseObject,
   SchemaObject,
 } from './openapi-types.js';
-
-export type { ApiInfo } from './openapi-types.js';
 
 export interface RouteInput {
   route: ResolvedRoute;
