@@ -79,3 +79,16 @@ test('normalizes a trailing slash on a configured base path', () => {
   expect(doc.paths['/api/rpc/health']).toBeDefined();
   expect(Object.keys(doc.paths)).not.toContain('/api/rpc//health');
 });
+
+test('normalizes a missing leading slash on a configured base path', () => {
+  const project = createProjectWithSource(`
+    ${STUBS}
+    const appRouter = router({
+      health: procedure.query(() => ({ ok: true })),
+    });
+  `);
+
+  const doc = buildOpenApi(scanTrpcRoutes(project, { basePath: 'api/rpc' }));
+
+  expect(doc.paths['/api/rpc/health']).toBeDefined();
+});

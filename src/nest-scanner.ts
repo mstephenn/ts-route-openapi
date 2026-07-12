@@ -1,6 +1,8 @@
 import { Node, type Decorator, type MethodDeclaration, type Project } from 'ts-morph';
 import { objectParams, unwrapPromise, usableObject, usableResponse } from './frameworks/shared.js';
 import { literalStatus } from './frameworks/status-calls.js';
+import { joinPaths } from './route-paths.js';
+import { syntheticRoute } from './synthetic-route.js';
 import type { HttpVerb, ParamType, ResolvedRoute, RouteTypes } from './types.js';
 
 const VERB_DECORATORS: Record<string, HttpVerb> = {
@@ -37,14 +39,13 @@ export function scanNestRoutes(project: Project): NestRoute[] {
           if (!decorator) continue;
           const path = joinPaths(basePath, decoratorPathArg(decorator));
           results.push({
-            route: {
+            route: syntheticRoute({
               verb,
               path,
               controllerName: cls.getName() ?? '(anonymous)',
               handlerName: method.getName(),
               method,
-              middlewareExpressions: [],
-            },
+            }),
             types: extractNestTypes(method, verb),
           });
         }
@@ -58,12 +59,6 @@ export function scanNestRoutes(project: Project): NestRoute[] {
 function decoratorPathArg(decorator: Decorator): string {
   const arg = decorator.getArguments()[0];
   return arg && Node.isStringLiteral(arg) ? arg.getLiteralValue() : '';
-}
-
-function joinPaths(base: string, sub: string): string {
-  const clean = (s: string) => s.replace(/^\/+|\/+$/g, '');
-  const joined = [clean(base), clean(sub)].filter(Boolean).join('/');
-  return `/${joined}`;
 }
 
 /** Nest's status: @HttpCode(N) wins (literal, const, or HttpStatus enum member); otherwise POST defaults to 201, everything else 200. */
