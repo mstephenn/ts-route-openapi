@@ -1,4 +1,5 @@
 import { Node, type CallExpression, type Project } from 'ts-morph';
+import { methodCallInfo } from './ast-calls.js';
 
 export interface TrpcProcedure {
   /** Dotted procedure path, e.g. `users.getById`. */
@@ -88,17 +89,13 @@ function collectNestedRouterCalls(
 
 /** A property value shaped `<procedureBuilder chain>.query(fn)` / `.mutation(fn)`. */
 function procedureFromChain(value: Node, path: string): TrpcProcedure | undefined {
-  if (!Node.isCallExpression(value)) return undefined;
-  const callee = value.getExpression();
-  if (!Node.isPropertyAccessExpression(callee)) return undefined;
+  const info = methodCallInfo(value);
+  if (!info || (info.method !== 'query' && info.method !== 'mutation')) return undefined;
 
-  const method = callee.getName();
-  if (method !== 'query' && method !== 'mutation') return undefined;
-
-  const [resolver] = value.getArguments();
+  const [resolver] = info.node.getArguments();
   if (!resolver) return undefined;
 
-  return { path, kind: method, call: value, resolver };
+  return { path, kind: info.method, call: info.node, resolver };
 }
 
 function proceduresFromRouter(

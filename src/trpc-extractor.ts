@@ -1,4 +1,5 @@
 import { Node, type CallExpression, type FunctionLikeDeclaration, type Type } from 'ts-morph';
+import { callChain } from './ast-calls.js';
 import { unwrapPromise } from './frameworks/shared.js';
 import { schemaFromZodExpression } from './validator-schemas.js';
 import type { TrpcProcedure } from './trpc-scanner.js';
@@ -15,30 +16,9 @@ export interface TrpcProcedureIO {
   resolverFn?: FunctionLikeDeclaration;
 }
 
-/** Every call in `call`'s receiver chain, outermost first (e.g. `.query()`, then `.output()`, then `.input()`). */
-function chainCalls(call: CallExpression): CallExpression[] {
-  const calls: CallExpression[] = [];
-  let current: Node = call;
-  while (Node.isCallExpression(current)) {
-    calls.push(current);
-    const callee = current.getExpression();
-    if (!Node.isPropertyAccessExpression(callee)) break;
-    current = callee.getExpression();
-  }
-  return calls;
-}
-
-/** Find the `.input(...)`/`.output(...)` call in `call`'s receiver chain, if present. */
-function chainCall(call: CallExpression, method: string): CallExpression | undefined {
-  return chainCalls(call).find((entry) => {
-    const callee = entry.getExpression();
-    return Node.isPropertyAccessExpression(callee) && callee.getName() === method;
-  });
-}
-
 function chainSchema(call: CallExpression, method: string): Schema | undefined {
-  const methodCall = chainCall(call, method);
-  const [arg] = methodCall?.getArguments() ?? [];
+  const methodCall = callChain(call).find((entry) => entry.method === method);
+  const [arg] = methodCall?.node.getArguments() ?? [];
   return arg && Node.isExpression(arg) ? schemaFromZodExpression(arg) : undefined;
 }
 

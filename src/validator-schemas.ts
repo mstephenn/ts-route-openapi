@@ -1,4 +1,5 @@
 import { Node, SyntaxKind, type Expression, type Node as MorphNode } from 'ts-morph';
+import { methodCallInfo } from './ast-calls.js';
 import type { ParamType, Schema } from './types.js';
 import { createWarnOnce } from './warn-once.js';
 
@@ -97,10 +98,9 @@ function zodSchema(expression: Expression): ZodResult {
     return { schema: {}, optional: false };
   }
 
-  const callee = expression.getExpression();
-  if (Node.isPropertyAccessExpression(callee)) {
-    const method = callee.getName();
-    const receiver = callee.getExpression();
+  const info = methodCallInfo(expression);
+  if (info) {
+    const { method, receiver } = info;
 
     if (method === 'optional') {
       const inner = zodSchema(receiver);
