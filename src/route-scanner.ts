@@ -1,5 +1,5 @@
 import { Node, type Project } from 'ts-morph';
-import { methodCallsIn } from './ast-calls.js';
+import { methodCallsIn } from './ast-helpers.js';
 import type { HttpVerb, RouteBinding } from './types.js';
 
 const DEFAULT_VERBS: HttpVerb[] = ['get', 'post', 'put', 'patch', 'delete'];

@@ -42,3 +42,16 @@ export function resolveIdentifierInitializer(node: Node): Node | undefined {
   if (!declaration || !Node.isVariableDeclaration(declaration)) return undefined;
   return declaration.getInitializer();
 }
+
+/**
+ * An `Identifier`'s own declaration (e.g. a bare `function foo(){}` reference), or —
+ * if that declaration is a variable — that variable's initializer. One symbol lookup
+ * either way, for callers that want to accept both "identifier names a declaration
+ * directly" and "identifier names a variable holding one" without resolving twice.
+ */
+export function resolveIdentifierDeclaration(node: Node): Node | undefined {
+  if (!Node.isIdentifier(node)) return undefined;
+  const declaration = node.getSymbol()?.getDeclarations()[0];
+  if (!declaration) return undefined;
+  return Node.isVariableDeclaration(declaration) ? declaration.getInitializer() : declaration;
+}

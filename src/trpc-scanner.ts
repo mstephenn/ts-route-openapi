@@ -1,5 +1,5 @@
 import { Node, type CallExpression, type Project } from 'ts-morph';
-import { methodCallInfo, resolveIdentifierInitializer } from './ast-calls.js';
+import { methodCallInfo, resolveIdentifierInitializer } from './ast-helpers.js';
 
 export interface TrpcProcedure {
   /** Dotted procedure path, e.g. `users.getById`. */
@@ -49,12 +49,17 @@ function routerProperties(call: CallExpression): { name: string; value: Node }[]
   return entries;
 }
 
+/** `value` itself, or (for an identifier) the variable it names — never gives up and returns undefined. */
+function resolveOrSelf(value: Node): Node {
+  return resolveIdentifierInitializer(value) ?? value;
+}
+
 /** Resolve a property value to the router call it names, whether inline or via a variable reference. */
 function resolveRouterCall(value: Node, cache: Map<Node, CallExpression | undefined>): CallExpression | undefined {
   const cached = cache.get(value);
   if (cached !== undefined || cache.has(value)) return cached;
 
-  const resolvedValue = resolveIdentifierInitializer(value) ?? value;
+  const resolvedValue = resolveOrSelf(value);
   const resolved = isRouterCall(resolvedValue) ? resolvedValue : undefined;
 
   cache.set(value, resolved);
@@ -103,7 +108,7 @@ function proceduresFromRouter(
       continue;
     }
 
-    const procedure = procedureFromChain(resolveIdentifierInitializer(value) ?? value, path);
+    const procedure = procedureFromChain(resolveOrSelf(value), path);
     if (procedure) procedures.push(procedure);
   }
 
