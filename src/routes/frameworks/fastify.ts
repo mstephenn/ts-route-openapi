@@ -1,5 +1,5 @@
 import type { ParameterDeclaration } from 'ts-morph';
-import type { ResolvedRoute, RouteTypes } from '../types.js';
+import type { ResolvedRoute, RouteTypes } from '../../shared/index.js';
 import {
   objectParams,
   tokenParams,

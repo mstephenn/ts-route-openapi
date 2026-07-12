@@ -1,9 +1,8 @@
 import { Node, type Decorator, type MethodDeclaration, type Project } from 'ts-morph';
-import { objectParams, unwrapPromise, usableObject, usableResponse } from './frameworks/shared.js';
-import { literalStatus } from './frameworks/status-calls.js';
+import { objectParams, unwrapPromise, usableObject, usableResponse, literalStatus } from './frameworks/index.js';
 import { joinPaths } from './route-paths.js';
 import { syntheticRoute } from './synthetic-route.js';
-import type { HttpVerb, ParamType, ResolvedRoute, RouteTypes } from './types.js';
+import type { HttpVerb, ParamType, ResolvedRoute, RouteTypes } from '../shared/index.js';
 
 const VERB_DECORATORS: Record<string, HttpVerb> = {
   Get: 'get',

@@ -1,5 +1,5 @@
 import { expect, test, vi } from 'vitest';
-import { mapType } from '../src/schema-mapper.js';
+import { mapType } from '../src/schema/index.js';
 import { typeOfAnnotation as typeOf, typesOfDeclarations, typesOfDeclarationsIn } from './support/types.js';
 
 test('maps primitives and arrays', () => {

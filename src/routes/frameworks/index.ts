@@ -1,5 +1,5 @@
 import type { ParameterDeclaration } from 'ts-morph';
-import type { ResolvedRoute, RouteTypes } from '../types.js';
+import type { ResolvedRoute, RouteTypes } from '../../shared/index.js';
 import { extractExpress } from './express.js';
 import { extractFastify } from './fastify.js';
 import { extractHono } from './hono.js';
@@ -24,4 +24,5 @@ export function tryFrameworkExtractors(
   return null;
 }
 
-export { tokenParams } from './shared.js';
+export * from './shared.js';
+export * from './status-calls.js';

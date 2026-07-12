@@ -1,5 +1,5 @@
 import { Node, type CallExpression, type Project } from 'ts-morph';
-import { methodCallInfo, resolveIdentifierInitializer } from './ast-helpers.js';
+import { methodCallInfo, resolveIdentifierInitializer } from '../shared/index.js';
 
 export interface TrpcProcedure {
   /** Dotted procedure path, e.g. `users.getById`. */

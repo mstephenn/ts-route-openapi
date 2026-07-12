@@ -1,6 +1,5 @@
 import type { Type } from 'ts-morph';
-import type { Schema } from './types.js';
-import { createWarnOnce } from './warn-once.js';
+import { createWarnOnce, type Schema } from '../shared/index.js';
 
 type Components = Record<string, Schema>;
 

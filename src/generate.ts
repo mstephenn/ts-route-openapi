@@ -1,12 +1,15 @@
 import { loadProject } from './project-loader.js';
-import { scanRoutes } from './route-scanner.js';
-import { resolveHandler } from './handler-resolver.js';
-import { extractTypes } from './type-extractor.js';
-import { scanNestRoutes } from './nest-scanner.js';
-import { scanTrpcRoutes, type TrpcRouteOptions } from './trpc-routes.js';
-import { buildOpenApi, type ApiInfo, type BuildOptions, type RouteInput } from './openapi-builder.js';
+import { scanRoutes, resolveHandler, scanNestRoutes } from './routes/index.js';
+import { extractTypes } from './schema/index.js';
+import { scanTrpcRoutes, type TrpcRouteOptions } from './trpc/index.js';
+import {
+  buildOpenApi,
+  type ApiInfo,
+  type BuildOptions,
+  type RouteInput,
+  type OpenApiDocument,
+} from './openapi/index.js';
 import { loadConfig, type GeneratorConfig } from './config.js';
-import type { OpenApiDocument } from './openapi-types.js';
 
 export interface GenerateOptions extends Omit<BuildOptions, 'config'> {
   config?: GeneratorConfig;

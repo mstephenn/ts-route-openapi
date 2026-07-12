@@ -1,6 +1,6 @@
 import type { ParameterDeclaration, Type } from 'ts-morph';
 import { pathTokens } from '../route-paths.js';
-import type { ParamType, ResolvedRoute } from '../types.js';
+import type { ParamType, ResolvedRoute } from '../../shared/index.js';
 
 /** Best name for a type: alias name first, then symbol name. */
 export function typeName(type: Type): string | undefined {

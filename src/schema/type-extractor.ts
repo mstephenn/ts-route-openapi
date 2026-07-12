@@ -1,8 +1,6 @@
 import type { ParameterDeclaration } from 'ts-morph';
-import { tryFrameworkExtractors } from './frameworks/index.js';
-import { tokenParams } from './frameworks/shared.js';
-import { pathTokens } from './route-paths.js';
-import type { ParamType, ResolvedRoute, RouteTypes } from './types.js';
+import { tryFrameworkExtractors, tokenParams, pathTokens } from '../routes/index.js';
+import type { ParamType, ResolvedRoute, RouteTypes } from '../shared/index.js';
 import { extractValidatorSchemas } from './validator-schemas.js';
 
 /**

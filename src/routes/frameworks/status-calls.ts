@@ -1,6 +1,5 @@
 import { Node, type ParameterDeclaration, type Type } from 'ts-morph';
-import { methodCallInfo, methodCallsIn } from '../ast-helpers.js';
-import type { ResponseType, RouteHandler } from '../types.js';
+import { methodCallInfo, methodCallsIn, type ResponseType, type RouteHandler } from '../../shared/index.js';
 
 /**
  * Resolve a status-code argument to its number via the type checker — covers

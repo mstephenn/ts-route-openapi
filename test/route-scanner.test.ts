@@ -1,5 +1,5 @@
 import { expect, test } from 'vitest';
-import { scanRoutes } from '../src/route-scanner.js';
+import { scanRoutes } from '../src/routes/index.js';
 import { createProjectWithSource } from './support/project.js';
 
 test('scanRoutes finds verb, path and handler expression', () => {

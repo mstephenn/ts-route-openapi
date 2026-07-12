@@ -1,5 +1,5 @@
-import type { OpenApiDocument, OperationObject } from '../../src/openapi-types.js';
-import type { HttpVerb } from '../../src/types.js';
+import type { OpenApiDocument, OperationObject } from '../../src/openapi/index.js';
+import type { HttpVerb } from '../../src/shared/index.js';
 
 /** The `properties` of an object-shaped SchemaObject (`schema-mapper` keeps schema shapes untyped). */
 export function schemaProperties(schema: unknown): Record<string, unknown> {

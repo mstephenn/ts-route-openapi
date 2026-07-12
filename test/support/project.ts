@@ -1,7 +1,7 @@
 import { Project, type ProjectOptions } from 'ts-morph';
-import { resolveHandler } from '../../src/handler-resolver.js';
-import { scanRoutes } from '../../src/route-scanner.js';
-import type { ResolvedRoute } from '../../src/types.js';
+import { resolveHandler } from '../../src/routes/index.js';
+import { scanRoutes } from '../../src/routes/index.js';
+import type { ResolvedRoute } from '../../src/shared/index.js';
 
 /** An in-memory ts-morph project, ready for `createSourceFile` calls. */
 export function createInMemoryProject(options: ProjectOptions = {}): Project {

@@ -1,9 +1,8 @@
 import { Node, type CallExpression, type FunctionLikeDeclaration, type Type } from 'ts-morph';
-import { callChain, resolveIdentifierDeclaration } from './ast-helpers.js';
-import { unwrapPromise } from './frameworks/shared.js';
-import { schemaFromZodExpression } from './validator-schemas.js';
+import { callChain, resolveIdentifierDeclaration, type Schema } from '../shared/index.js';
+import { unwrapPromise } from '../routes/index.js';
+import { schemaFromZodExpression } from '../schema/index.js';
 import type { TrpcProcedure } from './trpc-scanner.js';
-import type { Schema } from './types.js';
 
 export interface TrpcProcedureIO {
   /** From `.input(<zodSchema>)`, when present. */

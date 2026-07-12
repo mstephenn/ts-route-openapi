@@ -1,5 +1,5 @@
-import type { SecurityRequirement } from './config.js';
-import type { HttpVerb } from './types.js';
+import type { SecurityRequirement } from '../config.js';
+import type { HttpVerb } from '../shared/index.js';
 
 export interface ApiInfo {
   title: string;
