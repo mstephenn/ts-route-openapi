@@ -73,15 +73,59 @@ test('maps Date-typed properties to string/date-time without hoisting Date metho
   expect(result.components).toEqual({});
 });
 
-test('skips function-typed properties instead of hoisting their signatures', () => {
+test('describes function-typed properties by signature instead of hoisting their methods', () => {
   const result = mapType(typeOf('{ onClick: () => void }'));
 
   expect(result.schema).toEqual({
     type: 'object',
-    properties: { onClick: {} },
+    properties: { onClick: { description: 'Function: () => void' } },
     required: ['onClick'],
   });
   expect(result.components).toEqual({});
+});
+
+test('describes a callable property with parameters and a return type', () => {
+  const result = mapType(typeOf('{ onSave: (id: string, retry?: boolean) => Promise<boolean> }'));
+
+  expect(result.schema.properties).toEqual({
+    onSave: { description: 'Function: (id: string, retry?: boolean | undefined) => Promise<boolean>' },
+  });
+});
+
+test('describes a method-shorthand property the same way as an arrow-typed one', () => {
+  const result = mapType(typeOf('{ onSave(id: string): void }'));
+
+  expect(result.schema.properties).toEqual({
+    onSave: { description: 'Function: (id: string) => void' },
+  });
+});
+
+test('a callable property typed by a named function type alias describes the expanded signature, not the alias name', () => {
+  const [type] = typesOfDeclarations(
+    `type Handler = (id: string) => void;
+     declare const value: { onSave: Handler };`,
+    ['value'],
+  );
+
+  const result = mapType(type);
+
+  expect(result.schema.properties).toEqual({
+    onSave: { description: 'Function: (id: string) => void' },
+  });
+});
+
+test('a JSDoc comment on a callable property wins over the auto-generated signature description', () => {
+  const result = mapType(
+    typeOf(`{
+      /** Persists the record. */
+      onSave: () => void;
+    }`),
+    { descriptions: true },
+  );
+
+  expect(result.schema.properties).toEqual({
+    onSave: { description: 'Persists the record.' },
+  });
 });
 
 test('never emits invalid component names or method components for builtin types', () => {

@@ -1,4 +1,4 @@
-import { Node, type Type } from 'ts-morph';
+import { Node, type Signature, type Type } from 'ts-morph';
 import { jsDocText } from '../shared/index.js';
 import { createComponentRegistry, typeId, type ComponentRegistry } from './component-registry.js';
 
@@ -109,8 +109,11 @@ function toSchema(type: Type, context: SchemaContext): Schema {
     }
 
     // Callable types (functions, arrow types, etc.) have no meaningful OpenAPI
-    // representation; skip them rather than hoisting their method signatures.
-    if (type.getCallSignatures().length > 0) return {};
+    // shape to hoist; describe the signature instead of emitting an empty schema.
+    // Built from the call signature itself, not `type.getText()` — a named
+    // function type alias/interface's `getText()` is just its name, not its shape.
+    const signature = type.getCallSignatures()[0];
+    if (signature) return { description: `Function: ${signatureText(signature)}` };
 
     // Hoist under a project-source name: the alias name (`type User = {...}`)
     // wins over the structural symbol name (interface/class).
@@ -161,4 +164,15 @@ function objectSchema(type: Type, context: SchemaContext): Schema {
   const schema: Schema = { type: 'object', properties };
   if (required.length > 0) schema.required = required;
   return schema;
+}
+
+/** `(name: Type, name?: Type) => ReturnType`, expanded from the signature itself rather than the containing type's name. */
+function signatureText(signature: Signature): string {
+  const params = signature.getParameters().map((param) => {
+    const declaration = param.getDeclarations()[0];
+    const paramType = declaration ? param.getTypeAtLocation(declaration) : undefined;
+    const optional = declaration && Node.isParameterDeclaration(declaration) && declaration.hasQuestionToken();
+    return `${param.getName()}${optional ? '?' : ''}: ${paramType?.getText() ?? 'unknown'}`;
+  });
+  return `(${params.join(', ')}) => ${signature.getReturnType().getText()}`;
 }
