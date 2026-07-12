@@ -1,5 +1,6 @@
 import type { Type } from 'ts-morph';
 import type { Schema } from './types.js';
+import { createWarnOnce } from './warn-once.js';
 
 type Components = Record<string, Schema>;
 
@@ -107,13 +108,11 @@ export function createComponentRegistry(): ComponentRegistry {
   const componentRecordsByBaseName = new Map<string, ComponentRecord[]>();
   const usedComponentNames = new Set<string>();
   const inProgressTypeIds = new Set<number>();
-  const warnedCollisions = new Set<string>();
+  const warnOnce = createWarnOnce();
 
   function warnCollisionOnce(baseName: string, componentName: string): void {
-    const key = `${baseName}:${componentName}`;
-    if (warnedCollisions.has(key)) return;
-    warnedCollisions.add(key);
-    console.warn(
+    warnOnce(
+      `${baseName}:${componentName}`,
       `ts-route-openapi: component name collision for "${baseName}"; emitted "${componentName}" for a distinct schema.`,
     );
   }
