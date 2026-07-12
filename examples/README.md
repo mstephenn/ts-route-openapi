@@ -12,12 +12,13 @@ openapi`, never hand-edited.
 | [`nest/`](./nest) | NestJS 11 | paths, path params, query, body, responses — from `@Controller/@Get/@Param/@Query/@Body` decorators + method signatures |
 | [`hono/`](./hono) | Hono 4 | paths, path params, responses — from `c.json()`'s `TypedResponse<T>` |
 | [`koa/`](./koa) | Koa 2 + @koa/router | paths and path params (Koa's `ctx` carries no static route types) |
+| [`trpc/`](./trpc) | tRPC 11 | synthetic paths, query/body, responses — from `.input(zodSchema)`/`.output(zodSchema)` and resolver return types |
 | [`generic/`](./generic) | none | the plain typed-method convention, framework-free |
 
 ## Running an example
 
 ```sh
-cd express          # or fastify / nest / hono / koa
+cd express          # or fastify / nest / hono / koa / trpc
 npm install
 npm run openapi     # regenerate openapi.yaml from the source
 npm run dev         # boot the real server on :3000
@@ -29,12 +30,29 @@ curl -X POST localhost:3000/orders -H 'content-type: application/json' \
 curl localhost:3000/orders/o1
 ```
 
+The `trpc/` example exposes its procedures at synthetic paths instead
+(`/trpc/<dotted.path>`, matching what the generated spec documents), not the
+REST-shaped URLs above:
+
+```sh
+curl -X POST localhost:3000/trpc/orders.create \
+  -H 'content-type: application/json' -d '{"productId":"p9","quantity":3}'
+curl 'localhost:3000/trpc/orders.getById?input=%7B%22id%22%3A%22o1%22%7D'
+```
+
+**Known limitation:** tRPC's HTTP adapter wraps every response in a
+`{"result":{"data": ...}}` envelope; the generated spec documents the payload
+schema directly (unwrapped), since modeling the envelope isn't implemented
+yet.
+
 ## How much detail you get depends on the framework
 
 The tool reads whatever static type information the framework's idioms carry:
 
 - **Express / Fastify / NestJS** put request and response types in generics,
   decorators, and signatures — full schemas come out.
+- **tRPC** carries request/response schemas in `.input()`/`.output()` Zod
+  calls and the resolver's return type — full schemas come out too.
 - **Hono** types responses through `c.json()`; params/bodies are typed by
   middleware (validators), which is not yet supported — you get paths, path
   params, and response schemas.

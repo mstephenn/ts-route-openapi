@@ -102,8 +102,8 @@ const doc = generate(
 
 ## How it works
 
-The tool loads your project via its `tsconfig.json` and discovers routes two
-ways:
+The tool loads your project via its `tsconfig.json` and discovers routes
+three ways:
 
 1. **Registration call-sites** — any call of the shape
    `something.<verb>('/path', handler)` where `<verb>` is one of `get`,
@@ -113,6 +113,10 @@ ways:
    pointing at a function.
 2. **NestJS decorators** — `@Controller('base')` classes with
    `@Get/@Post/@Put/@Patch/@Delete` methods.
+3. **tRPC routers** — `router({...})` / `t.router({...})` procedure maps,
+   including nested sub-routers. Each `.query()`/`.mutation()` procedure is
+   exposed as a synthetic `GET`/`POST <base>/<dotted.path>` route (default
+   base `/trpc`, configurable via `generate()`'s `trpc.basePath` option).
 
 It then uses the **TypeScript type checker** on the handler to extract
 parameter and return types. Your registrations are the single source of
@@ -127,6 +131,7 @@ truth — nothing to keep in sync.
 | **NestJS** | `@Param('x')/@Query('x')/@Body()` decorated, typed method params + return type |
 | **Hono** | `TypedResponse<T>` from `c.json(...)` return types; path params from `:tokens`; `zValidator('json' | 'query', schema)` for Zod request schemas |
 | **Koa (+ @koa/router)** | paths and `:token` params only (`ctx` carries no static route types) |
+| **tRPC** | `.input(zodSchema)` for the request (query param for queries, body for mutations); `.output(zodSchema)` or the resolver's return type for the response |
 | **Anything else** | plain-typed handlers via the classification convention below; unknown framework objects fall back to `:token` string params |
 
 A registered route always makes it into the spec: when no types are
@@ -198,9 +203,9 @@ default security when `publicDecorator` is set.
 ## Examples
 
 Runnable, idiomatic **Express**, **Fastify**, **NestJS**, **Hono**, **Koa**,
-and framework-free examples — each with its generated `openapi.yaml`
-committed — live in [`examples/`](./examples). No adapters or code changes:
-install, run the CLI, get the spec.
+**tRPC**, and framework-free examples — each with its generated
+`openapi.yaml` committed — live in [`examples/`](./examples). No adapters or
+code changes: install, run the CLI, get the spec.
 
 ## Contributing
 
