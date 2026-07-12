@@ -1,5 +1,6 @@
 import type { Project } from 'ts-morph';
 import type { RouteInput } from './openapi-builder.js';
+import { joinPaths } from './route-paths.js';
 import { syntheticRoute } from './synthetic-route.js';
 import { extractTrpcProcedureIO } from './trpc-extractor.js';
 import { scanTrpcRouters, type TrpcProcedure } from './trpc-scanner.js';
@@ -20,7 +21,7 @@ function trpcRouteInput(procedure: TrpcProcedure, basePath: string): RouteInput 
 
   const route = syntheticRoute({
     verb: procedure.kind === 'mutation' ? 'post' : 'get',
-    path: `${basePath}/${procedure.path}`,
+    path: joinPaths(basePath, procedure.path),
     controllerName: '(trpc)',
     handlerName: procedure.path,
     method,
@@ -39,6 +40,6 @@ function trpcRouteInput(procedure: TrpcProcedure, basePath: string): RouteInput 
 
 /** Discover tRPC procedures in `project` and map each to a synthetic OpenAPI route input. */
 export function scanTrpcRoutes(project: Project, options: TrpcRouteOptions = {}): RouteInput[] {
-  const basePath = (options.basePath ?? '/trpc').replace(/\/+$/, '');
+  const basePath = options.basePath ?? '/trpc';
   return scanTrpcRouters(project).map((procedure) => trpcRouteInput(procedure, basePath));
 }
