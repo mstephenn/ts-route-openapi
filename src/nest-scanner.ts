@@ -1,6 +1,7 @@
 import { Node, type Decorator, type MethodDeclaration, type Project } from 'ts-morph';
 import { objectParams, unwrapPromise, usableObject, usableResponse } from './frameworks/shared.js';
 import { literalStatus } from './frameworks/status-calls.js';
+import { syntheticRoute } from './synthetic-route.js';
 import type { HttpVerb, ParamType, ResolvedRoute, RouteTypes } from './types.js';
 
 const VERB_DECORATORS: Record<string, HttpVerb> = {
@@ -37,14 +38,13 @@ export function scanNestRoutes(project: Project): NestRoute[] {
           if (!decorator) continue;
           const path = joinPaths(basePath, decoratorPathArg(decorator));
           results.push({
-            route: {
+            route: syntheticRoute({
               verb,
               path,
               controllerName: cls.getName() ?? '(anonymous)',
               handlerName: method.getName(),
               method,
-              middlewareExpressions: [],
-            },
+            }),
             types: extractNestTypes(method, verb),
           });
         }

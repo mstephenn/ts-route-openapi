@@ -1,8 +1,9 @@
 import type { Project } from 'ts-morph';
 import type { RouteInput } from './openapi-builder.js';
+import { syntheticRoute } from './synthetic-route.js';
 import { extractTrpcProcedureIO } from './trpc-extractor.js';
 import { scanTrpcRouters, type TrpcProcedure } from './trpc-scanner.js';
-import type { ResolvedRoute, RouteHandler, RouteTypes } from './types.js';
+import type { RouteHandler, RouteTypes } from './types.js';
 
 export interface TrpcRouteOptions {
   /** Prefix every procedure path with this base path. @default '/trpc' */
@@ -17,14 +18,13 @@ function trpcRouteInput(procedure: TrpcProcedure, basePath: string): RouteInput 
   // duck-type rather than assume a real function-like declaration.
   const method = (io.resolverFn ?? procedure.resolver) as unknown as RouteHandler;
 
-  const route: ResolvedRoute = {
+  const route = syntheticRoute({
     verb: procedure.kind === 'mutation' ? 'post' : 'get',
     path: `${basePath}/${procedure.path}`,
     controllerName: '(trpc)',
     handlerName: procedure.path,
     method,
-    middlewareExpressions: [],
-  };
+  });
 
   const types: RouteTypes = {
     pathParams: [],
