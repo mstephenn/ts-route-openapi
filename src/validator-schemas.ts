@@ -1,5 +1,5 @@
 import { Node, SyntaxKind, type Expression, type Node as MorphNode } from 'ts-morph';
-import { methodCallInfo } from './ast-calls.js';
+import { methodCallInfo, resolveIdentifierInitializer } from './ast-helpers.js';
 import type { ParamType, Schema } from './types.js';
 import { createWarnOnce } from './warn-once.js';
 
@@ -233,10 +233,7 @@ function propertyName(node: MorphNode): string | undefined {
 }
 
 function resolveInitializer(expression: Expression): Expression | undefined {
-  if (!Node.isIdentifier(expression)) return undefined;
-  const declaration = expression.getSymbol()?.getDeclarations()[0];
-  if (!declaration || !Node.isVariableDeclaration(declaration)) return undefined;
-  const initializer = declaration.getInitializer();
+  const initializer = resolveIdentifierInitializer(expression);
   return initializer && Node.isExpression(initializer) ? initializer : undefined;
 }
 

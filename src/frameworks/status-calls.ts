@@ -1,5 +1,5 @@
 import { Node, type ParameterDeclaration, type Type } from 'ts-morph';
-import { methodCallInfo, methodCallsIn } from '../ast-calls.js';
+import { methodCallInfo, methodCallsIn } from '../ast-helpers.js';
 import type { ResponseType, RouteHandler } from '../types.js';
 
 /**

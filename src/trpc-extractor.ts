@@ -1,5 +1,5 @@
 import { Node, type CallExpression, type FunctionLikeDeclaration, type Type } from 'ts-morph';
-import { callChain } from './ast-calls.js';
+import { callChain, resolveIdentifierDeclaration } from './ast-helpers.js';
 import { unwrapPromise } from './frameworks/shared.js';
 import { schemaFromZodExpression } from './validator-schemas.js';
 import type { TrpcProcedure } from './trpc-scanner.js';
@@ -26,16 +26,8 @@ function chainSchema(call: CallExpression, method: string): Schema | undefined {
 export function resolverFunction(resolver: Node): FunctionLikeDeclaration | undefined {
   if (Node.isFunctionLikeDeclaration(resolver)) return resolver;
 
-  if (Node.isIdentifier(resolver)) {
-    const declaration = resolver.getSymbol()?.getDeclarations()[0];
-    if (Node.isFunctionLikeDeclaration(declaration)) return declaration;
-    if (declaration && Node.isVariableDeclaration(declaration)) {
-      const initializer = declaration.getInitializer();
-      if (Node.isFunctionLikeDeclaration(initializer)) return initializer;
-    }
-  }
-
-  return undefined;
+  const target = resolveIdentifierDeclaration(resolver);
+  return Node.isFunctionLikeDeclaration(target) ? target : undefined;
 }
 
 /** Extract a tRPC procedure's `.input()`/`.output()` schemas and (Promise-unwrapped) resolver return type. */

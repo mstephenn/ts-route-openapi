@@ -1,4 +1,5 @@
 import { Node } from 'ts-morph';
+import { resolveIdentifierDeclaration } from './ast-helpers.js';
 import type { ResolvedRoute, RouteBinding } from './types.js';
 
 /**
@@ -36,28 +37,14 @@ export function resolveHandler(binding: RouteBinding): ResolvedRoute | null {
   }
 
   if (Node.isIdentifier(expr)) {
-    const declaration = expr.getSymbol()?.getDeclarations()[0];
-    if (declaration && Node.isFunctionDeclaration(declaration)) {
+    const target = resolveIdentifierDeclaration(expr);
+    if (Node.isFunctionDeclaration(target) || Node.isArrowFunction(target) || Node.isFunctionExpression(target)) {
       return {
         ...base,
         controllerName: '(function)',
         handlerName: expr.getText(),
-        method: declaration,
+        method: target,
       };
-    }
-    if (declaration && Node.isVariableDeclaration(declaration)) {
-      const initializer = declaration.getInitializer();
-      if (
-        initializer &&
-        (Node.isArrowFunction(initializer) || Node.isFunctionExpression(initializer))
-      ) {
-        return {
-          ...base,
-          controllerName: '(function)',
-          handlerName: expr.getText(),
-          method: initializer,
-        };
-      }
     }
     return null;
   }
