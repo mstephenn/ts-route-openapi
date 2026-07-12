@@ -1,7 +1,7 @@
 {
   "name": "ts-route-openapi",
-  "version": "1.0.0",
-  "description": "Generate OpenAPI 3.0.3 specs from TypeScript route\u2192controller code via static analysis (ts-morph) \u2014 no decorators or JSDoc required.",
+  "version": "1.0.1",
+  "description": "Generate OpenAPI 3.0.3 specs from TypeScript route→controller code via static analysis (ts-morph) — no decorators or JSDoc required.",
   "license": "MIT",
   "author": "mstephenn",
   "repository": {
