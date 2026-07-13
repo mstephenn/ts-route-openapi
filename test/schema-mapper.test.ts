@@ -100,6 +100,25 @@ test('describes a method-shorthand property the same way as an arrow-typed one',
   });
 });
 
+test('an overloaded callable property describes every signature, joined by " | "', () => {
+  const [type] = typesOfDeclarations(
+    `interface Handlers {
+       onSave(id: string): void;
+       onSave(id: number): void;
+     }
+     declare const value: Handlers;`,
+    ['value'],
+  );
+
+  const result = mapType(type);
+
+  expect(result.components.Handlers.properties).toEqual({
+    onSave: {
+      description: 'Function: (id: string) => void | (id: number) => void',
+    },
+  });
+});
+
 test('a callable property typed by a named function type alias describes the expanded signature, not the alias name', () => {
   const [type] = typesOfDeclarations(
     `type Handler = (id: string) => void;

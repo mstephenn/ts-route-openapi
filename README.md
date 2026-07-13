@@ -239,7 +239,8 @@ See [`CONTRIBUTING.md`](./CONTRIBUTING.md) for the full workflow.
 - **Callable types** (functions, methods) map to a schema-less
   `{ description: 'Function: <signature text>' }` (overridden by the
   property's own JSDoc when present) rather than being hoisted like an
-  object type. Overloaded signatures only describe the first overload.
+  object type. An overloaded callable's description joins every
+  signature with ` | `.
 
 ## License
 

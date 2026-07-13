@@ -109,11 +109,16 @@ function toSchema(type: Type, context: SchemaContext): Schema {
     }
 
     // Callable types (functions, arrow types, etc.) have no meaningful OpenAPI
-    // shape to hoist; describe the signature instead of emitting an empty schema.
-    // Built from the call signature itself, not `type.getText()` — a named
-    // function type alias/interface's `getText()` is just its name, not its shape.
-    const signature = type.getCallSignatures()[0];
-    if (signature) return { description: `Function: ${signatureText(signature)}` };
+    // shape to hoist; describe the signature(s) instead of emitting an empty
+    // schema. Built from the call signatures themselves, not `type.getText()` —
+    // a named function type alias/interface's `getText()` is just its name, not
+    // its shape. An overloaded callable has multiple call signatures; all of
+    // them are described, joined by " | " (a single-signature callable joins
+    // to just that one signature, unchanged from before).
+    const signatures = type.getCallSignatures();
+    if (signatures.length > 0) {
+      return { description: `Function: ${signatures.map(signatureText).join(' | ')}` };
+    }
 
     // Hoist under a project-source name: the alias name (`type User = {...}`)
     // wins over the structural symbol name (interface/class).
