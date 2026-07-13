@@ -105,6 +105,7 @@ function zodSchema(expression: Expression): ZodResult {
   const info = methodCallInfo(expression);
   if (info) {
     const { method, receiver } = info;
+    const args = expression.getArguments();
 
     if (method === 'optional') {
       const inner = zodSchema(receiver);
@@ -114,30 +115,161 @@ function zodSchema(expression: Expression): ZodResult {
       const inner = zodSchema(receiver);
       return { schema: { ...inner.schema, nullable: true }, optional: inner.optional };
     }
-    if (method === 'array' && receiver.getText() !== 'z') {
+    if (method === 'nullish') {
       const inner = zodSchema(receiver);
-      return { schema: { type: 'array', items: inner.schema }, optional: false };
+      return { schema: { ...inner.schema, nullable: true }, optional: true };
     }
 
-    const namespace = receiver.getText();
-    const args = expression.getArguments();
-    if (namespace !== 'z') {
+    // `z.<method>(...)` constructs a base schema; anything else is a modifier
+    // chained onto a receiver that is itself a (possibly nested) Zod schema.
+    if (receiver.getText() === 'z') {
+      const base = zodBaseSchema(method, args);
+      if (base) return { schema: base, optional: false };
       warnUnsupportedZod(expression);
       return { schema: {}, optional: false };
     }
 
-    if (method === 'string') return { schema: { type: 'string' }, optional: false };
-    if (method === 'number') return { schema: { type: 'number' }, optional: false };
-    if (method === 'boolean') return { schema: { type: 'boolean' }, optional: false };
-    if (method === 'object') return { schema: zodObject(args[0]), optional: false };
-    if (method === 'array') return { schema: { type: 'array', items: zodArg(args[0]) }, optional: false };
-    if (method === 'enum') return { schema: zodEnum(args[0]), optional: false };
-    if (method === 'literal') return { schema: zodLiteral(args[0]), optional: false };
-    if (method === 'union') return { schema: zodUnion(args[0]), optional: false };
+    const inner = zodSchema(receiver);
+    const chained = zodChainedSchema(method, args, inner.schema);
+    if (chained) return { schema: chained, optional: inner.optional };
+    warnUnsupportedZod(expression);
+    return { schema: inner.schema, optional: inner.optional };
   }
 
   warnUnsupportedZod(expression);
   return { schema: {}, optional: false };
+}
+
+function zodBaseSchema(method: string, args: MorphNode[]): Schema | undefined {
+  switch (method) {
+    case 'string':
+      return { type: 'string' };
+    case 'number':
+      return { type: 'number' };
+    case 'boolean':
+      return { type: 'boolean' };
+    case 'email':
+      return { type: 'string', format: 'email' };
+    case 'url':
+      return { type: 'string', format: 'uri' };
+    case 'uuid':
+      return { type: 'string', format: 'uuid' };
+    case 'object':
+      return zodObject(args[0]);
+    case 'array':
+      return { type: 'array', items: zodArg(args[0]) };
+    case 'enum':
+      return zodEnum(args[0]);
+    case 'literal':
+      return zodLiteral(args[0]);
+    case 'union':
+      return zodUnion(args[0]);
+    default:
+      return undefined;
+  }
+}
+
+/** Apply a chained modifier method (e.g. `.min(1)`, `.trim()`, `.extend({...})`) to an already-resolved schema. */
+function zodChainedSchema(method: string, args: MorphNode[], schema: Schema): Schema | undefined {
+  switch (method) {
+    case 'array':
+      return { type: 'array', items: schema };
+    case 'min':
+      return applyBound(schema, 'min', args[0]);
+    case 'max':
+      return applyBound(schema, 'max', args[0]);
+    case 'length': {
+      const n = numericArg(args[0]);
+      if (n === undefined) return schema;
+      return schema.type === 'array' ? { ...schema, minItems: n, maxItems: n } : { ...schema, minLength: n, maxLength: n };
+    }
+    case 'int':
+      return { ...schema, type: 'integer' };
+    case 'positive':
+      return { ...schema, minimum: 0, exclusiveMinimum: true };
+    case 'nonnegative':
+      return { ...schema, minimum: 0 };
+    case 'negative':
+      return { ...schema, maximum: 0, exclusiveMaximum: true };
+    case 'nonpositive':
+      return { ...schema, maximum: 0 };
+    case 'email':
+      return { ...schema, format: 'email' };
+    case 'url':
+      return { ...schema, format: 'uri' };
+    case 'uuid':
+      return { ...schema, format: 'uuid' };
+    case 'datetime':
+      return { ...schema, format: 'date-time' };
+    case 'regex': {
+      const pattern = regexArg(args[0]);
+      return pattern === undefined ? schema : { ...schema, pattern };
+    }
+    case 'default': {
+      const value = args[0] && Node.isExpression(args[0]) ? literalValue(args[0]) : undefined;
+      return value === undefined ? schema : { ...schema, default: value };
+    }
+    case 'describe': {
+      const text = args[0] && Node.isStringLiteral(args[0]) ? args[0].getLiteralValue() : undefined;
+      return text === undefined ? schema : { ...schema, description: text };
+    }
+    case 'extend': {
+      const extension = args[0] && Node.isObjectLiteralExpression(args[0]) ? zodObject(args[0]) : undefined;
+      if (!extension) return schema;
+      const properties = isSchema(schema.properties) ? schema.properties : {};
+      const extensionProperties = isSchema(extension.properties) ? extension.properties : {};
+      const required = Array.isArray(schema.required) ? schema.required : [];
+      const extensionRequired = Array.isArray(extension.required) ? extension.required : [];
+      return {
+        ...schema,
+        properties: { ...properties, ...extensionProperties },
+        required: [...required, ...extensionRequired],
+      };
+    }
+    case 'and': {
+      const other = args[0] && Node.isExpression(args[0]) ? zodSchema(args[0]).schema : undefined;
+      return other ? { allOf: [schema, other] } : schema;
+    }
+    case 'or': {
+      const other = args[0] && Node.isExpression(args[0]) ? zodSchema(args[0]).schema : undefined;
+      return other ? { oneOf: [schema, other] } : schema;
+    }
+    case 'trim':
+    case 'toLowerCase':
+    case 'toUpperCase':
+    case 'refine':
+    case 'superRefine':
+    case 'transform':
+    case 'catch':
+    case 'pipe':
+    case 'brand':
+    case 'readonly':
+    case 'meta':
+      return schema;
+    default:
+      return undefined;
+  }
+}
+
+function applyBound(schema: Schema, kind: 'min' | 'max', arg: MorphNode | undefined): Schema {
+  const n = numericArg(arg);
+  if (n === undefined) return schema;
+  if (schema.type === 'array') return { ...schema, [kind === 'min' ? 'minItems' : 'maxItems']: n };
+  if (schema.type === 'number' || schema.type === 'integer') {
+    return { ...schema, [kind === 'min' ? 'minimum' : 'maximum']: n };
+  }
+  return { ...schema, [kind === 'min' ? 'minLength' : 'maxLength']: n };
+}
+
+function numericArg(arg: MorphNode | undefined): number | undefined {
+  if (!arg || !Node.isNumericLiteral(arg)) return undefined;
+  return Number(arg.getText());
+}
+
+function regexArg(arg: MorphNode | undefined): string | undefined {
+  if (!arg || arg.getKind() !== SyntaxKind.RegularExpressionLiteral) return undefined;
+  const match = /^\/(.*)\/[a-z]*$/.exec(arg.getText());
+  return match?.[1];
 }
 
 function zodObject(arg: MorphNode | undefined): Schema {
@@ -173,13 +305,15 @@ function zodArg(arg: MorphNode | undefined): Schema {
 }
 
 function zodEnum(arg: MorphNode | undefined): Schema {
-  if (!arg || !Node.isArrayLiteralExpression(arg)) {
+  const resolved = (arg && Node.isExpression(arg) ? resolveInitializer(arg) : undefined) ?? arg;
+  const array = resolved && Node.isAsExpression(resolved) ? resolved.getExpression() : resolved;
+  if (!array || !Node.isArrayLiteralExpression(array)) {
     warnUnsupportedZod(arg);
     return {};
   }
   return {
     type: 'string',
-    enum: arg.getElements().filter(Node.isStringLiteral).map((entry) => entry.getLiteralValue()),
+    enum: array.getElements().filter(Node.isStringLiteral).map((entry) => entry.getLiteralValue()),
   };
 }
 

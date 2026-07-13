@@ -35,10 +35,17 @@ export function callChain(call: CallExpression): MethodCall[] {
   return calls;
 }
 
+/** The symbol an `Identifier` refers to, following import aliases to their originating declaration. */
+function resolvedSymbol(node: Node): import('ts-morph').Symbol | undefined {
+  if (!Node.isIdentifier(node)) return undefined;
+  const symbol = node.getSymbol();
+  if (!symbol) return undefined;
+  return symbol.isAlias() ? symbol.getAliasedSymbol() : symbol;
+}
+
 /** Follow an `Identifier` to its variable declaration's initializer, if any. */
 export function resolveIdentifierInitializer(node: Node): Node | undefined {
-  if (!Node.isIdentifier(node)) return undefined;
-  const declaration = node.getSymbol()?.getDeclarations()[0];
+  const declaration = resolvedSymbol(node)?.getDeclarations()[0];
   if (!declaration || !Node.isVariableDeclaration(declaration)) return undefined;
   return declaration.getInitializer();
 }
@@ -50,8 +57,7 @@ export function resolveIdentifierInitializer(node: Node): Node | undefined {
  * directly" and "identifier names a variable holding one" without resolving twice.
  */
 export function resolveIdentifierDeclaration(node: Node): Node | undefined {
-  if (!Node.isIdentifier(node)) return undefined;
-  const declaration = node.getSymbol()?.getDeclarations()[0];
+  const declaration = resolvedSymbol(node)?.getDeclarations()[0];
   if (!declaration) return undefined;
   return Node.isVariableDeclaration(declaration) ? declaration.getInitializer() : declaration;
 }
