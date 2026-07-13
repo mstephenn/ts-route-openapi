@@ -3,7 +3,7 @@ import { buildOpenApi } from '../src/openapi/index.js';
 import { extractTypes } from '../src/schema/index.js';
 import { scanNestRoutes } from '../src/routes/index.js';
 import type { ResolvedRoute } from '../src/shared/index.js';
-import { createProjectWithSource, scanResolvedRoutes } from './support/project.js';
+import { createProjectWithFiles, createProjectWithSource, scanResolvedRoutes } from './support/project.js';
 import { typesOfDeclarationsIn } from './support/types.js';
 import { getOperation, schemaProperties } from './support/openapi.js';
 
@@ -320,4 +320,120 @@ test('unsupported Zod constructs emit an empty schema with a warning', () => {
     'ts-route-openapi: unsupported Zod schema construct; emitted {} for z.record(z.string())',
   );
   warn.mockRestore();
+});
+
+function inputsFromFiles(files: Record<string, string>) {
+  return scanResolvedRoutes(createProjectWithFiles(files)).map((route) => ({
+    route,
+    types: extractTypes(route),
+  }));
+}
+
+test('resolves a Zod schema imported from another module, not just locally declared', () => {
+  const doc = buildOpenApi(
+    inputsFromFiles({
+      'schemas.ts': `
+        declare const z: any;
+        export const createUserInput = z.object({ name: z.string(), age: z.number().optional() });
+      `,
+      'app.ts': `
+        import { createUserInput } from './schemas.js';
+        declare const app: any;
+        declare const zValidator: any;
+        app.post('/users', zValidator('json', createUserInput), () => undefined);
+      `,
+    }),
+  );
+
+  expect(getOperation(doc, '/users', 'post').requestBody!.content['application/json'].schema).toEqual({
+    type: 'object',
+    properties: { name: { type: 'string' }, age: { type: 'number' } },
+    required: ['name'],
+  });
+});
+
+test('chained Zod modifiers (min/max/regex/email/default/trim) refine the base schema instead of discarding it', () => {
+  const doc = buildOpenApi(
+    inputsFrom(`
+      declare const app: any;
+      declare const z: any;
+      declare const zValidator: any;
+      const input = z.object({
+        name: z.string().trim().min(1).max(60),
+        email: z.string().email(),
+        age: z.number().int().nonnegative(),
+        slug: z.string().regex(/^[a-z0-9-]+$/),
+        role: z.string().default('member'),
+      });
+      app.post('/things', zValidator('json', input), () => undefined);
+    `),
+  );
+
+  expect(getOperation(doc, '/things', 'post').requestBody!.content['application/json'].schema).toEqual({
+    type: 'object',
+    properties: {
+      name: { type: 'string', minLength: 1, maxLength: 60 },
+      email: { type: 'string', format: 'email' },
+      age: { type: 'integer', minimum: 0 },
+      slug: { type: 'string', pattern: '^[a-z0-9-]+$' },
+      role: { type: 'string', default: 'member' },
+    },
+    required: ['name', 'email', 'age', 'slug', 'role'],
+  });
+});
+
+test('.extend() merges properties onto the base object schema', () => {
+  const doc = buildOpenApi(
+    inputsFrom(`
+      declare const app: any;
+      declare const z: any;
+      declare const zValidator: any;
+      const base = z.object({ name: z.string() });
+      const input = base.extend({ id: z.string() });
+      app.post('/things', zValidator('json', input), () => undefined);
+    `),
+  );
+
+  expect(getOperation(doc, '/things', 'post').requestBody!.content['application/json'].schema).toEqual({
+    type: 'object',
+    properties: { name: { type: 'string' }, id: { type: 'string' } },
+    required: ['name', 'id'],
+  });
+});
+
+test('.refine()/.transform() pass the base schema through unchanged instead of discarding it', () => {
+  const doc = buildOpenApi(
+    inputsFrom(`
+      declare const app: any;
+      declare const z: any;
+      declare const zValidator: any;
+      const input = z.object({ password: z.string().min(8).refine(() => true, 'weak') });
+      app.post('/things', zValidator('json', input), () => undefined);
+    `),
+  );
+
+  expect(getOperation(doc, '/things', 'post').requestBody!.content['application/json'].schema).toEqual({
+    type: 'object',
+    properties: { password: { type: 'string', minLength: 8 } },
+    required: ['password'],
+  });
+});
+
+test('z.enum() resolves an array referenced by identifier, including "as const" arrays', () => {
+  const doc = buildOpenApi(
+    inputsFrom(`
+      declare const app: any;
+      declare const z: any;
+      declare const zValidator: any;
+      const ROLES = ['admin', 'member'] as const;
+      const input = z.object({ role: z.enum(ROLES) });
+      app.post('/things', zValidator('json', input), () => undefined);
+    `),
+  );
+
+  expect(getOperation(doc, '/things', 'post').requestBody!.content['application/json'].schema).toEqual({
+    type: 'object',
+    properties: { role: { type: 'string', enum: ['admin', 'member'] } },
+    required: ['role'],
+  });
 });
