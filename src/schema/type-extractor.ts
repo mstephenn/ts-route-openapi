@@ -72,6 +72,8 @@ function finalizeTypes(
     ...types,
     pathParams: validators.pathParams ?? types.pathParams,
     query: validators.query ?? types.query,
+    headers: validators.headers ?? types.headers,
+    cookies: validators.cookies ?? types.cookies,
     bodySchema: validators.bodySchema ?? types.bodySchema,
     responses: withThrownStatuses(types, route.method),
   };

@@ -556,6 +556,166 @@ test('Nest public decorators remove inferred class-level guard security', () => 
   expect(getOperation(doc, '/admin/health', 'get').security).toEqual([]);
 });
 
+test('maps generic validator middleware schemas into body, query, headers and cookies', () => {
+  const doc = buildOpenApi(
+    inputsFrom(`
+      declare const app: any;
+      declare const z: any;
+      declare function validateBody(schema: unknown): unknown;
+      declare function validateQuery(schema: unknown): unknown;
+      declare function validateHeaders(schema: unknown): unknown;
+      declare function validateCookies(schema: unknown): unknown;
+      app.post(
+        '/sessions',
+        validateBody(z.object({ email: z.string().email() })),
+        validateQuery(z.object({ redirect: z.string().optional() })),
+        validateHeaders(z.object({ 'x-client-id': z.string() })),
+        validateCookies(z.object({ session_id: z.string() })),
+        () => ({ ok: true }),
+      );
+    `),
+  );
+
+  const op = getOperation(doc, '/sessions', 'post');
+  expect(op.requestBody!.content['application/json'].schema).toEqual({
+    type: 'object',
+    properties: { email: { type: 'string', format: 'email' } },
+    required: ['email'],
+  });
+  expect(op.parameters).toContainEqual({
+    name: 'redirect',
+    in: 'query',
+    required: false,
+    schema: { type: 'string' },
+  });
+  expect(op.parameters).toContainEqual({
+    name: 'x-client-id',
+    in: 'header',
+    required: false,
+    schema: { type: 'string' },
+  });
+  expect(op.parameters).toContainEqual({
+    name: 'session_id',
+    in: 'cookie',
+    required: false,
+    schema: { type: 'string' },
+  });
+});
+
+test('maps generic validator middleware path params and imported schemas', () => {
+  const doc = buildOpenApi(
+    inputsFromFiles({
+      'schemas.ts': `
+        declare const z: any;
+        export const paramsSchema = z.object({ orgId: z.string().uuid() });
+      `,
+      'app.ts': `
+        import { paramsSchema } from './schemas.js';
+        declare const app: any;
+        declare function validateParams(schema: unknown): unknown;
+        app.get('/orgs/:orgId', validateParams(paramsSchema), () => ({ ok: true }));
+      `,
+    }),
+  );
+
+  expect(getOperation(doc, '/orgs/{orgId}', 'get').parameters).toContainEqual({
+    name: 'orgId',
+    in: 'path',
+    required: true,
+    schema: { type: 'string', format: 'uuid' },
+  });
+});
+
+test('maps JSON-schema object literals from generic validator middleware', () => {
+  const doc = buildOpenApi(
+    inputsFrom(`
+      declare const app: any;
+      declare function validate(target: string, schema: unknown): unknown;
+      app.post('/events', validate('body', {
+        type: 'object',
+        properties: { name: { type: 'string' } },
+        required: ['name'],
+      }), () => ({ ok: true }));
+    `),
+  );
+
+  expect(getOperation(doc, '/events', 'post').requestBody!.content['application/json'].schema).toEqual({
+    type: 'object',
+    properties: { name: { type: 'string' } },
+    required: ['name'],
+  });
+});
+
+test('route-level middleware request schemas override inherited middleware schemas', () => {
+  const doc = buildOpenApi(
+    inputsFrom(`
+      declare const app: any;
+      declare const z: any;
+      declare function validateQuery(schema: unknown): unknown;
+      app.use(validateQuery(z.object({ inherited: z.string() })));
+      app.get('/search', validateQuery(z.object({ local: z.number() })), () => ({ ok: true }));
+    `),
+  );
+
+  expect(getOperation(doc, '/search', 'get').parameters).toContainEqual({
+    name: 'local',
+    in: 'query',
+    required: false,
+    schema: { type: 'number' },
+  });
+  expect(getOperation(doc, '/search', 'get').parameters).not.toContainEqual({
+    name: 'inherited',
+    in: 'query',
+    required: false,
+    schema: { type: 'string' },
+  });
+});
+
+test('maps Nest decorator validator schemas into request metadata', () => {
+  const project = createProjectWithSource(
+    `
+      function Controller(path?: string): ClassDecorator { return () => {}; }
+      function Post(path?: string): MethodDecorator { return () => {}; }
+      function UsePipes(...pipes: unknown[]): MethodDecorator & ClassDecorator { return () => {}; }
+      declare const z: any;
+      declare function validateBody(schema: unknown): unknown;
+
+      @Controller('users')
+      class UsersController {
+        @UsePipes(validateBody(z.object({ name: z.string() })))
+        @Post()
+        create(): { ok: boolean } {
+          return { ok: true };
+        }
+      }
+    `,
+    'nest.ts',
+    { compilerOptions: { experimentalDecorators: true } },
+  );
+
+  expect(getOperation(buildOpenApi(scanNestRoutes(project)), '/users', 'post').requestBody!.content['application/json'].schema).toEqual({
+    type: 'object',
+    properties: { name: { type: 'string' } },
+    required: ['name'],
+  });
+});
+
+test('does not map dynamic validator middleware schemas', () => {
+  const doc = buildOpenApi(
+    inputsFrom(`
+      declare const app: any;
+      declare const schema: unknown;
+      declare function validateBody(schema: unknown): unknown;
+      declare function unrelated(target: string, schema: unknown): unknown;
+      app.post('/dynamic', validateBody(schema), () => ({ ok: true }));
+      app.post('/unrelated', unrelated('body', { type: 'string' }), () => ({ ok: true }));
+    `),
+  );
+
+  expect(getOperation(doc, '/dynamic', 'post').requestBody!.content['application/json'].schema).toEqual({});
+  expect(getOperation(doc, '/unrelated', 'post').requestBody).toBeUndefined();
+});
+
 test('unsupported Zod constructs emit an empty schema with a warning', () => {
   const warn = vi.spyOn(console, 'warn').mockImplementation(() => undefined);
 

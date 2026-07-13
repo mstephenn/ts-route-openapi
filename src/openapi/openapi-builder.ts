@@ -73,6 +73,12 @@ export function buildOpenApi(
     for (const q of types.query) {
       parameters.push({ name: q.name, in: 'query', required: false, schema: paramSchema(q) });
     }
+    for (const h of types.headers ?? []) {
+      parameters.push({ name: h.name, in: 'header', required: false, schema: paramSchema(h) });
+    }
+    for (const c of types.cookies ?? []) {
+      parameters.push({ name: c.name, in: 'cookie', required: false, schema: paramSchema(c) });
+    }
     if (parameters.length > 0) operation.parameters = parameters;
 
     if (types.bodySchema || types.body) {

@@ -11,7 +11,7 @@ export type SchemaObject = Record<string, unknown>;
 
 export interface ParameterObject {
   name: string;
-  in: 'path' | 'query';
+  in: 'path' | 'query' | 'header' | 'cookie';
   required: boolean;
   schema: SchemaObject;
 }

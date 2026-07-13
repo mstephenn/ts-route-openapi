@@ -1,4 +1,4 @@
-import { Node, type Decorator, type MethodDeclaration, type Project } from 'ts-morph';
+import { Node, type ClassDeclaration, type Decorator, type MethodDeclaration, type Project } from 'ts-morph';
 import {
   objectParams,
   unwrapPromise,
@@ -9,6 +9,7 @@ import {
 } from './frameworks/index.js';
 import { joinPaths } from './route-paths.js';
 import { syntheticRoute } from './synthetic-route.js';
+import { extractValidatorSchemas } from '../schema/validator-schemas.js';
 import type { HttpVerb, ParamType, ResolvedRoute, RouteTypes } from '../shared/index.js';
 
 const VERB_DECORATORS: Record<string, HttpVerb> = {
@@ -52,7 +53,7 @@ export function scanNestRoutes(project: Project): NestRoute[] {
               handlerName: method.getName(),
               method,
             }),
-            types: extractNestTypes(method, verb),
+            types: extractNestTypes(method, verb, cls),
           });
         }
       }
@@ -75,7 +76,7 @@ function nestStatus(method: MethodDeclaration, verb: HttpVerb): number {
   return verb === 'post' ? 201 : 200;
 }
 
-function extractNestTypes(method: MethodDeclaration, verb: HttpVerb): RouteTypes {
+function extractNestTypes(method: MethodDeclaration, verb: HttpVerb, cls: ClassDeclaration): RouteTypes {
   const pathParams: ParamType[] = [];
   const query: ParamType[] = [];
   let body: RouteTypes['body'];
@@ -115,5 +116,18 @@ function extractNestTypes(method: MethodDeclaration, verb: HttpVerb): RouteTypes
     responses: status !== 200 ? [{ status, type: response }] : undefined,
   };
 
-  return { ...types, responses: withThrownStatuses(types, method) };
+  const validators = extractValidatorSchemas([
+    ...cls.getDecorators().flatMap((decorator) => decorator.getArguments()),
+    ...method.getDecorators().flatMap((decorator) => decorator.getArguments()),
+  ]);
+
+  return {
+    ...types,
+    pathParams: validators.pathParams ?? types.pathParams,
+    query: validators.query ?? types.query,
+    headers: validators.headers ?? types.headers,
+    cookies: validators.cookies ?? types.cookies,
+    bodySchema: validators.bodySchema ?? types.bodySchema,
+    responses: withThrownStatuses(types, method),
+  };
 }

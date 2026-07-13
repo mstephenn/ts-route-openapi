@@ -58,6 +58,8 @@ export interface ResponseType {
 export interface RouteTypes {
   pathParams: ParamType[];
   query: ParamType[];
+  headers?: ParamType[];
+  cookies?: ParamType[];
   body?: Type;
   bodySchema?: Schema;
   /** Single-status shorthand: documented as the 200 response when `responses` is absent. */
