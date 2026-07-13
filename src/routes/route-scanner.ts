@@ -1,10 +1,11 @@
 import { Node, type Project } from 'ts-morph';
-import { methodCallsIn } from '../shared/index.js';
+import { createWarnOnce, methodCallsIn } from '../shared/index.js';
 import type { HttpVerb, RouteBinding } from '../shared/index.js';
 import { joinPaths } from './route-paths.js';
 
 const DEFAULT_VERBS: HttpVerb[] = ['get', 'post', 'put', 'patch', 'delete'];
 const MIDDLEWARE_METHODS = new Set(['use', 'addHook']);
+const warnOnce = createWarnOnce();
 
 interface ScopedMiddleware {
   receiver: string;
@@ -35,7 +36,10 @@ export function scanRoutes(project: Project, verbs: HttpVerb[] = DEFAULT_VERBS):
     const mountedReceivers: MountedReceiver[] = [];
     for (const { node, method, receiver } of methodCallsIn(sourceFile, MIDDLEWARE_METHODS)) {
       const receiverName = receiverKey(receiver);
-      if (!receiverName) continue;
+      if (!receiverName) {
+        warnIfRelevantMiddleware(node.getText(), 'dynamic middleware receiver');
+        continue;
+      }
       if (method === 'use') {
         const registration = middlewareRegistration(node.getArguments());
         if (!registration) continue;
@@ -107,6 +111,7 @@ function middlewareRegistration(args: Node[]): { prefix: string; middlewareExpre
   if (args.length === 0) return undefined;
   const [first, ...rest] = args;
   if (Node.isStringLiteral(first)) return { prefix: first.getLiteralValue(), middlewareExpressions: rest };
+  if (args.length > 1) warnIfRelevantMiddleware(args.map((arg) => arg.getText()).join(', '), 'dynamic middleware path');
   return { prefix: '', middlewareExpressions: args };
 }
 
@@ -124,6 +129,11 @@ function mountedReceiver(node: Node | undefined): string | undefined {
 function receiverKey(node: Node): string | undefined {
   if (Node.isIdentifier(node) || Node.isPropertyAccessExpression(node)) return node.getText();
   return undefined;
+}
+
+function warnIfRelevantMiddleware(text: string, reason: string): void {
+  if (!/(auth|guard|jwt|bearer|basic|api.?key|validate|validator|schema|response|error)/i.test(text)) return;
+  warnOnce(`${reason}:${text}`, `ts-route-openapi: skipped middleware inference for ${text.slice(0, 80)} (${reason}).`);
 }
 
 function lastHandlerIndex(args: Node[]): number {

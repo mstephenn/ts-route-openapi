@@ -795,6 +795,57 @@ test('maps Nest decorator response schemas into operation responses', () => {
   });
 });
 
+test('warns when security-like middleware has ambiguous scheme evidence', () => {
+  const warn = vi.spyOn(console, 'warn').mockImplementation(() => undefined);
+
+  buildOpenApi(
+    inputsFrom(`
+      function requireAuth(req: unknown, res: unknown, next: () => void): void { next(); }
+      declare const app: any;
+      app.get('/admin', requireAuth, () => ({ ok: true }));
+    `),
+  );
+
+  expect(warn).toHaveBeenCalledWith(
+    'ts-route-openapi: skipped security inference for requireAuth (ambiguous security scheme).',
+  );
+  warn.mockRestore();
+});
+
+test('warns when relevant middleware scope uses a dynamic path', () => {
+  const warn = vi.spyOn(console, 'warn').mockImplementation(() => undefined);
+
+  buildOpenApi(
+    inputsFrom(`
+      function requireApiKeyAuth(req: unknown, res: unknown, next: () => void): void { next(); }
+      declare const app: any;
+      const securePath = '/secure';
+      app.use(securePath, requireApiKeyAuth);
+      app.get('/secure/users', () => ({ ok: true }));
+    `),
+  );
+
+  expect(warn).toHaveBeenCalledWith(
+    'ts-route-openapi: skipped middleware inference for securePath, requireApiKeyAuth (dynamic middleware path).',
+  );
+  warn.mockRestore();
+});
+
+test('does not warn for ordinary middleware without security or schema evidence', () => {
+  const warn = vi.spyOn(console, 'warn').mockImplementation(() => undefined);
+
+  buildOpenApi(
+    inputsFrom(`
+      function logger(req: unknown, res: unknown, next: () => void): void { next(); }
+      declare const app: any;
+      app.get('/public', logger, () => ({ ok: true }));
+    `),
+  );
+
+  expect(warn).not.toHaveBeenCalled();
+  warn.mockRestore();
+});
+
 test('unsupported Zod constructs emit an empty schema with a warning', () => {
   const warn = vi.spyOn(console, 'warn').mockImplementation(() => undefined);
 
