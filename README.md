@@ -203,7 +203,87 @@ OpenAPI security metadata:
 `securitySchemes` is copied to `components.securitySchemes`; `security` is
 applied to every operation unless a `securityOverrides` entry matches the route
 verb and glob path. For NestJS, `@Public()` on a class or method drops the
-default security when `publicDecorator` is set.
+default security when `publicDecorator` is set. Explicit config wins over
+middleware-derived security when both are present.
+
+### Middleware-derived metadata
+
+When middleware is statically attached to a route, a literal path prefix, a
+mounted router, a Fastify hook, or a NestJS decorator, `ts-route-openapi` can
+derive security plus request/response schemas without extra config:
+
+```ts
+declare const app: any;
+declare const z: any;
+
+declare function requireJwtAuth(req: unknown, res: unknown, next: () => void): void;
+declare function validateBody(schema: unknown): unknown;
+declare function validateQuery(schema: unknown): unknown;
+declare function validateHeaders(schema: unknown): unknown;
+declare function validateCookies(schema: unknown): unknown;
+declare function errorResponseSchema(status: number, schema?: unknown): unknown;
+
+app.use('/admin', requireJwtAuth);
+app.post(
+  '/admin/sessions/:orgId',
+  validateBody(z.object({ email: z.string().email() })),
+  validateQuery(z.object({ redirect: z.string().optional() })),
+  validateHeaders(z.object({ 'x-client-id': z.string() })),
+  validateCookies(z.object({ session_id: z.string() })),
+  errorResponseSchema(401, z.object({ message: z.string() })),
+  () => ({ ok: true }),
+);
+```
+
+The generated operation includes the inherited bearer scheme, request body,
+query/header/cookie parameters, and documented error payload:
+
+```yaml
+components:
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+paths:
+  /admin/sessions/{orgId}:
+    post:
+      security:
+        - bearerAuth: []
+      parameters:
+        - { name: orgId, in: path, required: true, schema: { type: string } }
+        - { name: redirect, in: query, required: false, schema: { type: string } }
+        - { name: x-client-id, in: header, required: false, schema: { type: string } }
+        - { name: session_id, in: cookie, required: false, schema: { type: string } }
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                email: { type: string, format: email }
+              required: [email]
+      responses:
+        '200': { description: OK }
+        '401':
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  message: { type: string }
+                required: [message]
+```
+
+Supported schema inputs use the same Zod and JSON-schema object-literal
+mapping as route validators. Generic middleware factory names must make their
+target explicit, such as `validateBody(schema)`, `validateQuery(schema)`,
+`validateParams(schema)`, `validateHeaders(schema)`, `validateCookies(schema)`,
+`validate('body', schema)`, or `errorResponseSchema(401, schema)`. Hono
+`zValidator('json' | 'query' | 'param' | 'header' | 'cookie', schema)`,
+Fastify `schema.body/querystring/params/headers/cookies`, and Nest decorator
+arguments such as `@UsePipes(validateBody(schema))` and
+`@UseFilters(errorResponseSchema(401, schema))` are read through the same path.
 
 ## Examples
 
