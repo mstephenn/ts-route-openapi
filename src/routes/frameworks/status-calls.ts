@@ -17,6 +17,15 @@ function refersToParam(receiver: Node, param: ParameterDeclaration): boolean {
   return receiver.getSymbol()?.getDeclarations()[0] === param;
 }
 
+/** True when both expressions are identifiers resolving to the same declaration — e.g. the same `app` variable, even across an import. */
+export function sameAppInstance(a: Node, b: Node): boolean {
+  if (!Node.isIdentifier(a) || !Node.isIdentifier(b)) return false;
+  const defsA = a.getDefinitionNodes();
+  const defsB = b.getDefinitionNodes();
+  if (defsA.length === 0 || defsB.length === 0) return false;
+  return defsA[0] === defsB[0];
+}
+
 const EXPRESS_RESPONSE_METHODS = new Set(['json', 'send', 'end']);
 const FASTIFY_STATUS_METHODS = new Set(['code', 'status']);
 

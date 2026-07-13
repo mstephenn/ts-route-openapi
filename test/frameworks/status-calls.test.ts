@@ -1,6 +1,8 @@
 import { expect, test } from 'vitest';
 import { extractTypes } from '../../src/schema/index.js';
-import { createProjectWithSource, scanResolvedRoutes } from '../support/project.js';
+import { methodCallsIn } from '../../src/shared/index.js';
+import { sameAppInstance } from '../../src/routes/frameworks/status-calls.js';
+import { createProjectWithFiles, createProjectWithSource, scanResolvedRoutes } from '../support/project.js';
 
 function routesFrom(code: string) {
   return scanResolvedRoutes(createProjectWithSource(code, 'app.ts'));
@@ -188,4 +190,29 @@ test('a shadowed param in a nested closure is not misattributed for either expre
 
   expect(extractTypes(expressRoute).responses?.map((r) => r.status)).toEqual([200]);
   expect(extractTypes(fastifyRoute).responses).toBeUndefined();
+});
+
+test('sameAppInstance matches an app identifier to itself across files via import, not to an unrelated identifier', () => {
+  const project = createProjectWithFiles({
+    'app.ts': `export declare const app: any;`,
+    'routes.ts': `
+      import { app } from './app.js';
+      app.get('/x', () => {});
+    `,
+    'error-handler.ts': `
+      import { app } from './app.js';
+      app.use((err: any, req: any, res: any, next: any) => {});
+    `,
+    'other.ts': `
+      declare const other: any;
+      other.use((err: any, req: any, res: any, next: any) => {});
+    `,
+  });
+
+  const routeCall = methodCallsIn(project.getSourceFileOrThrow('routes.ts'), new Set(['get']))[0];
+  const errorCall = methodCallsIn(project.getSourceFileOrThrow('error-handler.ts'), new Set(['use']))[0];
+  const otherCall = methodCallsIn(project.getSourceFileOrThrow('other.ts'), new Set(['use']))[0];
+
+  expect(sameAppInstance(routeCall.receiver, errorCall.receiver)).toBe(true);
+  expect(sameAppInstance(routeCall.receiver, otherCall.receiver)).toBe(false);
 });
