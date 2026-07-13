@@ -1,6 +1,6 @@
 import { Node, type Decorator } from 'ts-morph';
 import type { SecurityRequirement } from '../config.js';
-import type { ResolvedRoute } from '../shared/index.js';
+import { createWarnOnce, type ResolvedRoute } from '../shared/index.js';
 
 export interface InferredSecurity {
   schemes: Record<string, Record<string, unknown>>;
@@ -11,6 +11,8 @@ interface SchemeEvidence {
   name: string;
   scheme: Record<string, unknown>;
 }
+
+const warnOnce = createWarnOnce();
 
 export function inferRouteSecurity(route: ResolvedRoute): InferredSecurity | undefined {
   const middlewareExpressions = route.middlewareExpressions ?? [];
@@ -38,7 +40,9 @@ function securityFromExpression(node: Node): SchemeEvidence[] {
   const fromName = nameText ? securityFromName(nameText) : undefined;
   const fromCall = Node.isCallExpression(node) ? securityFromCall(node) : undefined;
   const fromDeclaration = resolved ? securityFromDeclaration(resolved) : undefined;
-  return [fromCall, fromName, fromDeclaration].filter((x): x is SchemeEvidence => Boolean(x));
+  const evidence = [fromCall, fromName, fromDeclaration].filter((x): x is SchemeEvidence => Boolean(x));
+  if (evidence.length === 0) warnIfSecurityRelevant(node.getText(), 'ambiguous security scheme');
+  return evidence;
 }
 
 function securityFromObjectLiteral(node: Node): SchemeEvidence[] {
@@ -115,11 +119,15 @@ function apiKeyFromFactory(name: string, args: Node[]): SchemeEvidence | undefin
   if (!normalized.includes('apikey')) return undefined;
 
   const keyName = stringArg(args[0]);
-  if (!keyName) return undefined;
+  if (!keyName) {
+    warnIfSecurityRelevant(name, 'dynamic apiKey name');
+    return undefined;
+  }
 
   if (normalized.includes('header')) return apiKey('apiKeyHeader', 'header', keyName);
   if (normalized.includes('query')) return apiKey('apiKeyQuery', 'query', keyName);
   if (normalized.includes('cookie')) return apiKey('apiKeyCookie', 'cookie', keyName);
+  warnIfSecurityRelevant(name, 'ambiguous apiKey location');
   return undefined;
 }
 
@@ -148,4 +156,9 @@ function basic(): SchemeEvidence {
 
 function apiKey(name: string, location: string, keyName: string): SchemeEvidence {
   return { name, scheme: { type: 'apiKey', in: location, name: keyName } };
+}
+
+function warnIfSecurityRelevant(text: string, reason: string): void {
+  if (!/(auth|guard|passport|jwt|bearer|basic|api.?key)/i.test(text)) return;
+  warnOnce(`${reason}:${text}`, `ts-route-openapi: skipped security inference for ${text.slice(0, 80)} (${reason}).`);
 }

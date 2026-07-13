@@ -236,6 +236,12 @@ See [`CONTRIBUTING.md`](./CONTRIBUTING.md) for the full workflow.
   dynamically, thrown from a re-exported third-party exception class, or
   set by middleware on a router mounted into the app (`app.use('/prefix',
   router)`) rather than the app instance itself — are not seen.
+- **Middleware inference is conservative**: security, request-schema, and
+  response-schema middleware only contributes OpenAPI metadata when the
+  middleware name, scope, status, and schema are statically knowable. Dynamic
+  receivers/paths, ambiguous auth middleware, dynamic API-key locations, and
+  unsupported schema values are skipped rather than guessed; relevant skipped
+  middleware emits a deduped warning explaining why.
 - **Callable types** (functions, methods) map to a schema-less
   `{ description: 'Function: <signature text>' }` (overridden by the
   property's own JSDoc when present) rather than being hoisted like an

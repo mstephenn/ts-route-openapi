@@ -100,7 +100,11 @@ function genericMiddlewareValidatorSchema(expression: Expression): ValidatorSche
   const [first, second] = expression.getArguments();
   const target = validatorTarget(expression.getExpression().getText(), first);
   const schemaArg = second && Node.isStringLiteral(first) ? second : first;
-  if (!target || !schemaArg || !Node.isExpression(schemaArg)) return undefined;
+  if (!target) return undefined;
+  if (!schemaArg || !Node.isExpression(schemaArg)) {
+    warnSkippedMiddlewareSchema(expression, 'missing or dynamic schema argument');
+    return undefined;
+  }
 
   const schema = schemaExpressionToOpenApi(schemaArg);
   if (target === 'body') return { bodySchema: schema };
@@ -139,9 +143,15 @@ function genericMiddlewareResponseSchemas(expression: Expression): ValidatorSche
 
   const [statusArg, schemaArg] = expression.getArguments();
   const status = numericLiteral(statusArg);
-  if (status === undefined) return undefined;
+  if (status === undefined) {
+    warnSkippedMiddlewareSchema(expression, 'dynamic response status');
+    return undefined;
+  }
   if (!schemaArg) return { responses: [{ status }] };
-  if (!Node.isExpression(schemaArg)) return undefined;
+  if (!Node.isExpression(schemaArg)) {
+    warnSkippedMiddlewareSchema(expression, 'missing or dynamic response schema');
+    return undefined;
+  }
   return { responses: [{ status, schema: schemaExpressionToOpenApi(schemaArg) }] };
 }
 
@@ -486,4 +496,9 @@ function isSchema(value: unknown): value is Schema {
 function warnUnsupportedZod(node: MorphNode | undefined): void {
   const text = node?.getText().slice(0, 80) ?? '(missing schema)';
   warnOnce(text, `ts-route-openapi: unsupported Zod schema construct; emitted {} for ${text}`);
+}
+
+function warnSkippedMiddlewareSchema(node: MorphNode, reason: string): void {
+  const text = node.getText().slice(0, 80);
+  warnOnce(`${reason}:${text}`, `ts-route-openapi: skipped middleware schema inference for ${text} (${reason}).`);
 }
