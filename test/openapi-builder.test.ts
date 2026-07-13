@@ -446,6 +446,116 @@ test('configured security takes precedence over inferred middleware security', (
   expect(getOperation(doc, '/admin', 'get').security).toEqual([{ configuredAuth: [] }]);
 });
 
+test('route-level inferred security does not leak to sibling routes', () => {
+  const doc = buildOpenApi(
+    inputsFrom(`
+      function requireJwtAuth(req: unknown, res: unknown, next: () => void): void { next(); }
+      declare const app: any;
+      app.get('/admin', requireJwtAuth, () => ({ ok: true }));
+      app.get('/public', () => ({ ok: true }));
+    `),
+  );
+
+  expect(getOperation(doc, '/admin', 'get').security).toEqual([{ bearerAuth: [] }]);
+  expect(getOperation(doc, '/public', 'get').security).toBeUndefined();
+});
+
+test('infers security inherited from same-receiver app middleware with a literal prefix', () => {
+  const doc = buildOpenApi(
+    inputsFrom(`
+      function requireJwtAuth(req: unknown, res: unknown, next: () => void): void { next(); }
+      declare const app: any;
+      app.use('/admin', requireJwtAuth);
+      app.get('/admin/users', () => ({ ok: true }));
+      app.get('/health', () => ({ ok: true }));
+    `),
+  );
+
+  expect(getOperation(doc, '/admin/users', 'get').security).toEqual([{ bearerAuth: [] }]);
+  expect(getOperation(doc, '/health', 'get').security).toBeUndefined();
+});
+
+test('infers security inherited from a mounted router with a literal mount path', () => {
+  const doc = buildOpenApi(
+    inputsFrom(`
+      function requireJwtAuth(req: unknown, res: unknown, next: () => void): void { next(); }
+      declare const app: any;
+      declare const router: any;
+      app.use('/admin', requireJwtAuth, router);
+      router.get('/users', () => ({ ok: true }));
+    `),
+  );
+
+  expect(getOperation(doc, '/admin/users', 'get').security).toEqual([{ bearerAuth: [] }]);
+});
+
+test('infers security inherited from Fastify hooks on the same receiver', () => {
+  const doc = buildOpenApi(
+    inputsFrom(`
+      function requireJwtAuth(req: unknown, reply: unknown, done: () => void): void { done(); }
+      declare const app: any;
+      app.addHook('preHandler', requireJwtAuth);
+      app.get('/admin', () => ({ ok: true }));
+    `),
+  );
+
+  expect(getOperation(doc, '/admin', 'get').security).toEqual([{ bearerAuth: [] }]);
+});
+
+test('does not infer inherited security from dynamic middleware scope', () => {
+  const doc = buildOpenApi(
+    inputsFrom(`
+      function requireJwtAuth(req: unknown, res: unknown, next: () => void): void { next(); }
+      declare const app: any;
+      declare function getApp(): any;
+      const adminPath = '/admin';
+      app.use(adminPath, requireJwtAuth);
+      app.get('/admin/users', () => ({ ok: true }));
+      getApp().use('/admin', requireJwtAuth);
+      getApp().get('/admin/settings', () => ({ ok: true }));
+    `),
+  );
+
+  expect(getOperation(doc, '/admin/users', 'get').security).toBeUndefined();
+  expect(getOperation(doc, '/admin/settings', 'get').security).toBeUndefined();
+});
+
+test('Nest public decorators remove inferred class-level guard security', () => {
+  const project = createProjectWithSource(
+    `
+      function Controller(path?: string): ClassDecorator { return () => {}; }
+      function Get(path?: string): MethodDecorator { return () => {}; }
+      function Public(): MethodDecorator { return () => {}; }
+      function UseGuards(...guards: unknown[]): MethodDecorator & ClassDecorator { return () => {}; }
+      class JwtAuthGuard {}
+
+      @Controller('admin')
+      @UseGuards(JwtAuthGuard)
+      class AdminController {
+        @Get('profile')
+        profile(): { ok: boolean } {
+          return { ok: true };
+        }
+
+        @Public()
+        @Get('health')
+        health(): { ok: boolean } {
+          return { ok: true };
+        }
+      }
+    `,
+    'nest.ts',
+    { compilerOptions: { experimentalDecorators: true } },
+  );
+
+  const doc = buildOpenApi(scanNestRoutes(project), undefined, {
+    config: { publicDecorator: 'Public' },
+  });
+
+  expect(getOperation(doc, '/admin/profile', 'get').security).toEqual([{ bearerAuth: [] }]);
+  expect(getOperation(doc, '/admin/health', 'get').security).toEqual([]);
+});
+
 test('unsupported Zod constructs emit an empty schema with a warning', () => {
   const warn = vi.spyOn(console, 'warn').mockImplementation(() => undefined);
 
