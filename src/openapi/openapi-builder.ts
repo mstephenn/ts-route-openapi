@@ -3,6 +3,7 @@ import { createSchemaMapper } from '../schema/index.js';
 import { jsDocText } from '../shared/index.js';
 import type { GeneratorConfig, SecurityRequirement } from '../config.js';
 import type { ParamType, ResolvedRoute, RouteTypes } from '../shared/index.js';
+import { inferRouteSecurity } from './security-inference.js';
 import type {
   ApiInfo,
   ComponentsObject,
@@ -39,6 +40,7 @@ export function buildOpenApi(
 ): OpenApiDocument {
   const paths: Record<string, PathItemObject> = {};
   const schemaMapper = createSchemaMapper({ descriptions: options.descriptions });
+  const inferredSecuritySchemes: Record<string, Record<string, unknown>> = {};
 
   for (const { route, types } of inputs) {
     const operation: Partial<OperationObject> = {};
@@ -48,7 +50,13 @@ export function buildOpenApi(
       if (docs.description) operation.description = docs.description;
       if (docs.deprecated) operation.deprecated = true;
     }
-    const security = operationSecurity(route, options.config);
+    const inferredSecurity = inferRouteSecurity(route);
+    if (inferredSecurity) {
+      for (const [name, scheme] of Object.entries(inferredSecurity.schemes)) {
+        inferredSecuritySchemes[name] ??= scheme;
+      }
+    }
+    const security = operationSecurity(route, options.config, inferredSecurity?.security);
     if (security) operation.security = security;
     const parameters: ParameterObject[] = [];
 
@@ -94,8 +102,12 @@ export function buildOpenApi(
   if (Object.keys(schemaMapper.components).length > 0) {
     components.schemas = schemaMapper.components;
   }
-  if (options.config?.securitySchemes) {
-    components.securitySchemes = options.config.securitySchemes;
+  const securitySchemes = {
+    ...inferredSecuritySchemes,
+    ...options.config?.securitySchemes,
+  };
+  if (Object.keys(securitySchemes).length > 0) {
+    components.securitySchemes = securitySchemes;
   }
   if (Object.keys(components).length > 0) {
     doc.components = components;
@@ -106,8 +118,9 @@ export function buildOpenApi(
 function operationSecurity(
   route: ResolvedRoute,
   config: GeneratorConfig | undefined,
+  inferred: SecurityRequirement[] | undefined,
 ): SecurityRequirement[] | undefined {
-  if (!config) return undefined;
+  if (!config) return inferred;
 
   const override = config.securityOverrides?.find((entry) => {
     const methodMatches = !entry.method || entry.method.toLowerCase() === route.verb;
@@ -117,7 +130,7 @@ function operationSecurity(
 
   if (isPublicRoute(route, config.publicDecorator)) return [];
 
-  return config.security;
+  return config.security ?? inferred;
 }
 
 function isPublicRoute(route: ResolvedRoute, decoratorName = 'Public'): boolean {

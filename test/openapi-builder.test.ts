@@ -303,6 +303,149 @@ test('maps Fastify route Zod schemas in route options', () => {
   });
 });
 
+test('infers bearer security from Express-style route middleware names', () => {
+  const doc = buildOpenApi(
+    inputsFrom(`
+      function requireJwtAuth(req: unknown, res: unknown, next: () => void): void { next(); }
+      declare const app: any;
+      app.get('/admin', requireJwtAuth, () => ({ ok: true }));
+    `),
+  );
+
+  expect(doc.components!.securitySchemes).toEqual({
+    bearerAuth: { type: 'http', scheme: 'bearer' },
+  });
+  expect(getOperation(doc, '/admin', 'get').security).toEqual([{ bearerAuth: [] }]);
+});
+
+test('infers bearer security from passport authenticate strategy middleware', () => {
+  const doc = buildOpenApi(
+    inputsFrom(`
+      declare const passport: { authenticate(strategy: string): unknown };
+      declare const app: any;
+      app.get('/admin', passport.authenticate('jwt'), () => ({ ok: true }));
+    `),
+  );
+
+  expect(doc.components!.securitySchemes).toEqual({
+    bearerAuth: { type: 'http', scheme: 'bearer' },
+  });
+  expect(getOperation(doc, '/admin', 'get').security).toEqual([{ bearerAuth: [] }]);
+});
+
+test('infers bearer security from Hono middleware names', () => {
+  const doc = buildOpenApi(
+    inputsFrom(`
+      function bearerAuth(c: unknown, next: () => void): void { next(); }
+      declare const app: any;
+      app.get('/me', bearerAuth, (c: any) => ({ ok: true }));
+    `),
+  );
+
+  expect(doc.components!.securitySchemes).toEqual({
+    bearerAuth: { type: 'http', scheme: 'bearer' },
+  });
+  expect(getOperation(doc, '/me', 'get').security).toEqual([{ bearerAuth: [] }]);
+});
+
+test('infers basic security from Koa router middleware names', () => {
+  const doc = buildOpenApi(
+    inputsFrom(`
+      const basicAuth = (ctx: unknown, next: () => void): void => next();
+      declare const router: any;
+      router.get('/reports', basicAuth, (ctx: any) => ({ ok: true }));
+    `),
+  );
+
+  expect(doc.components!.securitySchemes).toEqual({
+    basicAuth: { type: 'http', scheme: 'basic' },
+  });
+  expect(getOperation(doc, '/reports', 'get').security).toEqual([{ basicAuth: [] }]);
+});
+
+test('infers API-key security from explicit Fastify route hook factories', () => {
+  const doc = buildOpenApi(
+    inputsFrom(`
+      declare function apiKeyHeader(name: string): unknown;
+      declare const app: any;
+      app.get('/internal', { preHandler: apiKeyHeader('x-api-key') }, () => ({ ok: true }));
+    `),
+  );
+
+  expect(doc.components!.securitySchemes).toEqual({
+    apiKeyHeader: { type: 'apiKey', in: 'header', name: 'x-api-key' },
+  });
+  expect(getOperation(doc, '/internal', 'get').security).toEqual([{ apiKeyHeader: [] }]);
+});
+
+test('infers Nest security from guard decorators', () => {
+  const project = createProjectWithSource(
+    `
+      function Controller(path?: string): ClassDecorator { return () => {}; }
+      function Get(path?: string): MethodDecorator { return () => {}; }
+      function UseGuards(...guards: unknown[]): MethodDecorator & ClassDecorator { return () => {}; }
+      class JwtAuthGuard {}
+
+      @Controller('admin')
+      @UseGuards(JwtAuthGuard)
+      class AdminController {
+        @Get('profile')
+        profile(): { ok: boolean } {
+          return { ok: true };
+        }
+      }
+    `,
+    'nest.ts',
+    { compilerOptions: { experimentalDecorators: true } },
+  );
+
+  const doc = buildOpenApi(scanNestRoutes(project));
+
+  expect(doc.components!.securitySchemes).toEqual({
+    bearerAuth: { type: 'http', scheme: 'bearer' },
+  });
+  expect(getOperation(doc, '/admin/profile', 'get').security).toEqual([{ bearerAuth: [] }]);
+});
+
+test('does not infer security from ambiguous middleware', () => {
+  const doc = buildOpenApi(
+    inputsFrom(`
+      function checkSession(req: unknown, res: unknown, next: () => void): void { next(); }
+      function basicInfo(req: unknown, res: unknown, next: () => void): void { next(); }
+      declare const app: any;
+      app.get('/maybe', checkSession, () => ({ ok: true }));
+      app.get('/info', basicInfo, () => ({ ok: true }));
+    `),
+  );
+
+  expect(doc.components?.securitySchemes).toBeUndefined();
+  expect(getOperation(doc, '/maybe', 'get').security).toBeUndefined();
+  expect(getOperation(doc, '/info', 'get').security).toBeUndefined();
+});
+
+test('configured security takes precedence over inferred middleware security', () => {
+  const doc = buildOpenApi(
+    inputsFrom(`
+      function requireJwtAuth(req: unknown, res: unknown, next: () => void): void { next(); }
+      declare const app: any;
+      app.get('/admin', requireJwtAuth, () => ({ ok: true }));
+    `),
+    undefined,
+    {
+      config: {
+        securitySchemes: { configuredAuth: { type: 'http', scheme: 'bearer' } },
+        security: [{ configuredAuth: [] }],
+      },
+    },
+  );
+
+  expect(doc.components!.securitySchemes).toEqual({
+    bearerAuth: { type: 'http', scheme: 'bearer' },
+    configuredAuth: { type: 'http', scheme: 'bearer' },
+  });
+  expect(getOperation(doc, '/admin', 'get').security).toEqual([{ configuredAuth: [] }]);
+});
+
 test('unsupported Zod constructs emit an empty schema with a warning', () => {
   const warn = vi.spyOn(console, 'warn').mockImplementation(() => undefined);
 
