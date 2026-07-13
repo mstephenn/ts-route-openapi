@@ -17,7 +17,7 @@ export interface RouteBinding {
   path: string;
   handlerExpression: Node;
   middlewareExpressions: Node[];
-  receiver: Expression;
+  receiver?: Expression;
 }
 
 /** Any function-like declaration a route can bind to. */
@@ -35,7 +35,7 @@ export interface ResolvedRoute {
   handlerName: string;
   method: RouteHandler;
   middlewareExpressions: Node[];
-  receiver: Expression;
+  receiver?: Expression;
 }
 
 export interface ParamType {

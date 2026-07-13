@@ -99,7 +99,7 @@ export function expressErrorMiddlewareStatuses(route: ResolvedRoute): ResponseTy
       if (!handler || !resParam) continue;
 
       const sameFile = sourceFile === routeFile;
-      if (!sameFile && !sameAppInstance(info.receiver, route.receiver)) continue;
+      if (!sameFile && (!route.receiver || !sameAppInstance(info.receiver, route.receiver))) continue;
 
       for (const { status } of expressStatusResponses(handler, resParam, undefined)) {
         if (status !== 200) statuses.add(status);

@@ -50,5 +50,5 @@ test('scanRoutes captures the receiver expression the route is registered on', (
   `);
   const [binding] = scanRoutes(project);
 
-  expect(binding.receiver.getText()).toBe('app');
+  expect(binding.receiver?.getText()).toBe('app');
 });
