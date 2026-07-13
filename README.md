@@ -131,7 +131,7 @@ truth — nothing to keep in sync.
 | **NestJS** | `@Param('x')/@Query('x')/@Body()` decorated, typed method params + return type |
 | **Hono** | `TypedResponse<T>` from `c.json(...)` return types; path params from `:tokens`; `zValidator('json' | 'query', schema)` for Zod request schemas |
 | **Koa (+ @koa/router)** | paths and `:token` params only (`ctx` carries no static route types) |
-| **tRPC** | `.input(zodSchema)` for the request (query param for queries, body for mutations); `.output(zodSchema)` or the resolver's return type for the response |
+| **tRPC** | `.input(zodSchema)` for the request (query param for queries, body for mutations); `.output(zodSchema)` or the resolver's return type for the response; response statuses also fold in `throw new TRPCError({ code })` from any `.use(...)` middleware in the procedure's builder chain (walking through base-procedure variables and factory functions like `createAdminProcedure(label)`), mapped via tRPC's standard code → HTTP status table |
 | **Anything else** | plain-typed handlers via the classification convention below; unknown framework objects fall back to `:token` string params |
 
 A registered route always makes it into the spec: when no types are
@@ -322,6 +322,12 @@ See [`CONTRIBUTING.md`](./CONTRIBUTING.md) for the full workflow.
   receivers/paths, ambiguous auth middleware, dynamic API-key locations, and
   unsupported schema values are skipped rather than guessed; relevant skipped
   middleware emits a deduped warning explaining why.
+- **tRPC middleware inference covers response statuses only**: `.use(...)`
+  chains are walked for `throw new TRPCError({ code })` statuses, but not for
+  security schemes — unlike Express's `passport.authenticate(...)` or Nest's
+  `@UseGuards(...)`, there's no comparably name-shaped signal for an arbitrary
+  `ctx.session`-style check in a tRPC middleware body, so no
+  `securitySchemes`/`security` metadata is inferred from tRPC procedures.
 - **Callable types** (functions, methods) map to a schema-less
   `{ description: 'Function: <signature text>' }` (overridden by the
   property's own JSDoc when present) rather than being hoisted like an
