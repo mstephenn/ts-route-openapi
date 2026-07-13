@@ -42,3 +42,13 @@ test('scanRoutes ignores non-route method calls and calls without a string path'
   `);
   expect(scanRoutes(project)).toEqual([]);
 });
+
+test('scanRoutes captures the receiver expression the route is registered on', () => {
+  const project = createProjectWithSource(`
+    declare const app: any;
+    app.get('/users/:id', () => {});
+  `);
+  const [binding] = scanRoutes(project);
+
+  expect(binding.receiver.getText()).toBe('app');
+});

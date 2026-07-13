@@ -1,5 +1,6 @@
 import type {
   ArrowFunction,
+  Expression,
   FunctionDeclaration,
   FunctionExpression,
   MethodDeclaration,
@@ -16,6 +17,7 @@ export interface RouteBinding {
   path: string;
   handlerExpression: Node;
   middlewareExpressions: Node[];
+  receiver: Expression;
 }
 
 /** Any function-like declaration a route can bind to. */
@@ -33,6 +35,7 @@ export interface ResolvedRoute {
   handlerName: string;
   method: RouteHandler;
   middlewareExpressions: Node[];
+  receiver: Expression;
 }
 
 export interface ParamType {
