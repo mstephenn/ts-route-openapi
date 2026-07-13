@@ -12,7 +12,7 @@ export interface TrpcProcedure {
 }
 
 /** True for `router({...})` / `t.router({...})` call expressions. */
-function isRouterCall(node: Node): node is CallExpression {
+export function isRouterCall(node: Node): node is CallExpression {
   if (!Node.isCallExpression(node)) return false;
   const callee = node.getExpression();
   const name = Node.isPropertyAccessExpression(callee)

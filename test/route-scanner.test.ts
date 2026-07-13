@@ -1,4 +1,4 @@
-import { expect, test } from 'vitest';
+import { expect, test, vi } from 'vitest';
 import { scanRoutes } from '../src/routes/index.js';
 import { createProjectWithSource } from './support/project.js';
 
@@ -51,4 +51,26 @@ test('scanRoutes captures the receiver expression the route is registered on', (
   const [binding] = scanRoutes(project);
 
   expect(binding.receiver?.getText()).toBe('app');
+});
+
+test('scanRoutes skips tRPC router files without warning about their procedure-builder .use() chains', () => {
+  const warn = vi.spyOn(console, 'warn').mockImplementation(() => undefined);
+
+  const project = createProjectWithSource(`
+    declare const t: any;
+    declare const createAdminSiteProcedure: (label: string) => any;
+
+    const tagProcedure = createAdminSiteProcedure('managing tags').use(({ ctx, next }: any) => {
+      if (!ctx.site.clientId) throw new Error('unauthorized');
+      return next({ ctx });
+    });
+
+    const tagRouter = t.router({
+      list: tagProcedure.query(() => ({ tags: [] })),
+    });
+  `);
+
+  expect(scanRoutes(project)).toEqual([]);
+  expect(warn).not.toHaveBeenCalled();
+  warn.mockRestore();
 });
