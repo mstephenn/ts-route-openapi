@@ -87,7 +87,7 @@ function asErrorHandler(node: Node | undefined): RouteHandler | undefined {
  * registered on the same app/router instance (by symbol identity) anywhere else in the project.
  */
 export function expressErrorMiddlewareStatuses(route: ResolvedRoute): ResponseType[] {
-  const statuses = new Set<number>();
+  const responses = new Map<number, ResponseType>();
   const routeFile = route.method.getSourceFile();
 
   for (const sourceFile of routeFile.getProject().getSourceFiles()) {
@@ -101,13 +101,13 @@ export function expressErrorMiddlewareStatuses(route: ResolvedRoute): ResponseTy
       const sameFile = sourceFile === routeFile;
       if (!sameFile && (!route.receiver || !sameAppInstance(info.receiver, route.receiver))) continue;
 
-      for (const { status } of expressStatusResponses(handler, resParam, undefined)) {
-        if (status !== 200) statuses.add(status);
+      for (const response of expressStatusResponses(handler, resParam, undefined)) {
+        if (response.status !== 200 && !responses.has(response.status)) responses.set(response.status, response);
       }
     }
   }
 
-  return [...statuses].sort((a, b) => a - b).map((status) => ({ status }));
+  return [...responses.values()].sort((a, b) => a.status - b.status);
 }
 
 /** Merge additional schema-less statuses into an existing response list, keeping any already-present entry (and its type/schema) for a shared status. */

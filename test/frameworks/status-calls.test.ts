@@ -166,7 +166,7 @@ test('a file-scoped Express error-handling middleware adds its statuses to every
 
   expect(types.responses?.map((r) => [r.status, r.type?.getText()])).toEqual([
     [200, 'Order'],
-    [500, undefined],
+    [500, '{ message: string; }'],
   ]);
 });
 
@@ -216,7 +216,7 @@ test('a cross-file Express error-handling middleware on the same app instance ad
 
   expect(types.responses?.map((r) => [r.status, r.type?.getText()])).toEqual([
     [200, 'Order'],
-    [500, undefined],
+    [500, '{ message: string; }'],
   ]);
 });
 

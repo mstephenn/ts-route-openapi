@@ -121,6 +121,11 @@ function extractNestTypes(method: MethodDeclaration, verb: HttpVerb, cls: ClassD
     ...method.getDecorators().flatMap((decorator) => decorator.getArguments()),
   ]);
 
+  const thrownResponses = withThrownStatuses(types, method);
+  const responses = validators.responses
+    ? mergeResponses(thrownResponses ?? implicitResponses(types), validators.responses)
+    : thrownResponses;
+
   return {
     ...types,
     pathParams: validators.pathParams ?? types.pathParams,
@@ -128,6 +133,23 @@ function extractNestTypes(method: MethodDeclaration, verb: HttpVerb, cls: ClassD
     headers: validators.headers ?? types.headers,
     cookies: validators.cookies ?? types.cookies,
     bodySchema: validators.bodySchema ?? types.bodySchema,
-    responses: withThrownStatuses(types, method),
+    responses,
   };
+}
+
+function implicitResponses(types: RouteTypes): NonNullable<RouteTypes['responses']> {
+  return types.responses ?? [{ status: 200, type: types.response }];
+}
+
+function mergeResponses(
+  base: NonNullable<RouteTypes['responses']>,
+  additions: NonNullable<RouteTypes['responses']>,
+): NonNullable<RouteTypes['responses']> | undefined {
+  if (additions.length === 0) return base.length > 0 ? base : undefined;
+  const merged = new Map(base.map((entry) => [entry.status, entry]));
+  for (const addition of additions) {
+    const existing = merged.get(addition.status);
+    if (!existing || (!existing.schema && !existing.type)) merged.set(addition.status, addition);
+  }
+  return [...merged.values()].sort((a, b) => a.status - b.status);
 }
