@@ -1,6 +1,7 @@
-import { Node, type Project } from 'ts-morph';
+import { Node, type Project, type SourceFile } from 'ts-morph';
 import { createWarnOnce, methodCallsIn } from '../shared/index.js';
 import type { HttpVerb, RouteBinding } from '../shared/index.js';
+import { isRouterCall } from '../trpc/trpc-scanner.js';
 import { joinPaths } from './route-paths.js';
 
 const DEFAULT_VERBS: HttpVerb[] = ['get', 'post', 'put', 'patch', 'delete'];
@@ -32,6 +33,8 @@ export function scanRoutes(project: Project, verbs: HttpVerb[] = DEFAULT_VERBS):
   const bindings: RouteBinding[] = [];
 
   for (const sourceFile of project.getSourceFiles()) {
+    if (isTrpcRouterFile(sourceFile)) continue;
+
     const scopedMiddleware: ScopedMiddleware[] = [];
     const mountedReceivers: MountedReceiver[] = [];
     for (const { node, method, receiver } of methodCallsIn(sourceFile, MIDDLEWARE_METHODS)) {
@@ -105,6 +108,17 @@ export function scanRoutes(project: Project, verbs: HttpVerb[] = DEFAULT_VERBS):
   }
 
   return bindings;
+}
+
+/** True for a file defining a tRPC router (`router({...})`/`t.router({...})`) — owned by trpc-scanner.ts, not this scanner. */
+function isTrpcRouterFile(sourceFile: SourceFile): boolean {
+  let found = false;
+  sourceFile.forEachDescendant((node, traversal) => {
+    if (!isRouterCall(node)) return;
+    found = true;
+    traversal.stop();
+  });
+  return found;
 }
 
 function middlewareRegistration(args: Node[]): { prefix: string; middlewareExpressions: Node[] } | undefined {
