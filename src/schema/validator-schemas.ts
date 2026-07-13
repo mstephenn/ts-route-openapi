@@ -4,6 +4,7 @@ import {
   resolveIdentifierInitializer,
   createWarnOnce,
   type ParamType,
+  type ResponseType,
   type Schema,
 } from '../shared/index.js';
 
@@ -13,6 +14,7 @@ export interface ValidatorSchemas {
   pathParams?: ParamType[];
   headers?: ParamType[];
   cookies?: ParamType[];
+  responses?: ResponseType[];
 }
 
 interface ZodResult {
@@ -36,6 +38,9 @@ export function extractValidatorSchemas(expressions: MorphNode[]): ValidatorSche
 
     const generic = genericMiddlewareValidatorSchema(expression);
     if (generic) mergeValidatorSchemas(result, generic);
+
+    const responses = genericMiddlewareResponseSchemas(expression);
+    if (responses) mergeValidatorSchemas(result, responses);
   }
 
   return result;
@@ -47,6 +52,7 @@ function mergeValidatorSchemas(target: ValidatorSchemas, source: ValidatorSchema
   target.pathParams = source.pathParams ?? target.pathParams;
   target.headers = source.headers ?? target.headers;
   target.cookies = source.cookies ?? target.cookies;
+  target.responses = source.responses ? mergeResponses(target.responses ?? [], source.responses) : target.responses;
 }
 
 function honoValidatorSchema(expression: Expression): ValidatorSchemas | undefined {
@@ -124,6 +130,34 @@ function validatorTarget(calleeText: string, firstArg: MorphNode | undefined): '
   if (normalized.includes('header')) return 'headers';
   if (normalized.includes('cookie')) return 'cookies';
   return undefined;
+}
+
+function genericMiddlewareResponseSchemas(expression: Expression): ValidatorSchemas | undefined {
+  if (!Node.isCallExpression(expression)) return undefined;
+  const normalized = expression.getExpression().getText().split('.').at(-1)?.replace(/[^a-z0-9]/gi, '').toLowerCase() ?? '';
+  if (!/(response|error)/.test(normalized) || !/(schema|validator|validate)/.test(normalized)) return undefined;
+
+  const [statusArg, schemaArg] = expression.getArguments();
+  const status = numericLiteral(statusArg);
+  if (status === undefined) return undefined;
+  if (!schemaArg) return { responses: [{ status }] };
+  if (!Node.isExpression(schemaArg)) return undefined;
+  return { responses: [{ status, schema: schemaExpressionToOpenApi(schemaArg) }] };
+}
+
+function numericLiteral(arg: MorphNode | undefined): number | undefined {
+  if (!arg) return undefined;
+  const literal = arg.getType().getLiteralValue();
+  return typeof literal === 'number' ? literal : undefined;
+}
+
+function mergeResponses(base: ResponseType[], additions: ResponseType[]): ResponseType[] {
+  const merged = new Map(base.map((entry) => [entry.status, entry]));
+  for (const addition of additions) {
+    const existing = merged.get(addition.status);
+    if (!existing || (!existing.schema && !existing.type)) merged.set(addition.status, addition);
+  }
+  return [...merged.values()].sort((a, b) => a.status - b.status);
 }
 
 function schemaExpressionToOpenApi(expression: Expression): Schema {

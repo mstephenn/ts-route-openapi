@@ -716,6 +716,85 @@ test('does not map dynamic validator middleware schemas', () => {
   expect(getOperation(doc, '/unrelated', 'post').requestBody).toBeUndefined();
 });
 
+test('maps generic middleware response schemas into operation responses', () => {
+  const doc = buildOpenApi(
+    inputsFrom(`
+      declare const app: any;
+      declare const z: any;
+      declare function errorResponseSchema(status: number, schema?: unknown): unknown;
+      app.get(
+        '/admin',
+        errorResponseSchema(401, z.object({ message: z.string() })),
+        () => ({ ok: true }),
+      );
+    `),
+  );
+
+  expect(getOperation(doc, '/admin', 'get').responses['401'].content!['application/json'].schema).toEqual({
+    type: 'object',
+    properties: { message: { type: 'string' } },
+    required: ['message'],
+  });
+});
+
+test('keeps status-only middleware responses schema-less', () => {
+  const doc = buildOpenApi(
+    inputsFrom(`
+      declare const app: any;
+      declare function errorResponseSchema(status: number): unknown;
+      app.get('/admin', errorResponseSchema(403), () => ({ ok: true }));
+    `),
+  );
+
+  expect(getOperation(doc, '/admin', 'get').responses['403'].content).toBeUndefined();
+});
+
+test('handler response schemas win when middleware declares the same status', () => {
+  const doc = buildOpenApi(
+    inputsFrom(`
+      declare const app: any;
+      declare const z: any;
+      declare function responseSchema(status: number, schema: unknown): unknown;
+      app.get('/ok', responseSchema(200, z.object({ middleware: z.string() })), () => ({ handler: true }));
+    `),
+  );
+
+  expect(getOperation(doc, '/ok', 'get').responses['200'].content!['application/json'].schema).toEqual({
+    type: 'object',
+    properties: { handler: { type: 'boolean' } },
+    required: ['handler'],
+  });
+});
+
+test('maps Nest decorator response schemas into operation responses', () => {
+  const project = createProjectWithSource(
+    `
+      function Controller(path?: string): ClassDecorator { return () => {}; }
+      function Get(path?: string): MethodDecorator { return () => {}; }
+      function UseFilters(...filters: unknown[]): MethodDecorator & ClassDecorator { return () => {}; }
+      declare const z: any;
+      declare function errorResponseSchema(status: number, schema: unknown): unknown;
+
+      @Controller('admin')
+      class AdminController {
+        @UseFilters(errorResponseSchema(401, z.object({ message: z.string() })))
+        @Get()
+        profile(): { ok: boolean } {
+          return { ok: true };
+        }
+      }
+    `,
+    'nest.ts',
+    { compilerOptions: { experimentalDecorators: true } },
+  );
+
+  expect(getOperation(buildOpenApi(scanNestRoutes(project)), '/admin', 'get').responses['401'].content!['application/json'].schema).toEqual({
+    type: 'object',
+    properties: { message: { type: 'string' } },
+    required: ['message'],
+  });
+});
+
 test('unsupported Zod constructs emit an empty schema with a warning', () => {
   const warn = vi.spyOn(console, 'warn').mockImplementation(() => undefined);
 
