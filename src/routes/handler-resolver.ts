@@ -14,6 +14,7 @@ export function resolveHandler(binding: RouteBinding): ResolvedRoute | null {
     verb: binding.verb,
     path: binding.path,
     middlewareExpressions: binding.middlewareExpressions,
+    receiver: binding.receiver,
   };
 
   if (Node.isArrowFunction(expr) || Node.isFunctionExpression(expr)) {

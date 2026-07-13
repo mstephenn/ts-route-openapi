@@ -1,11 +1,12 @@
-import { Node, SyntaxKind, type ClassDeclaration, type SourceFile } from 'ts-morph';
+import { Node, SyntaxKind, type ClassDeclaration } from 'ts-morph';
 import {
   methodCallInfo,
   resolveIdentifierDeclaration,
+  type ResolvedRoute,
   type ResponseType,
   type RouteHandler,
 } from '../../shared/index.js';
-import { expressStatusResponses, literalStatus } from './status-calls.js';
+import { expressStatusResponses, literalStatus, sameAppInstance } from './status-calls.js';
 
 /** NestJS built-in `HttpException` subclasses (`@nestjs/common`) and the status each maps to. */
 const NEST_HTTP_EXCEPTIONS: Record<string, number> = {
@@ -81,20 +82,28 @@ function asErrorHandler(node: Node | undefined): RouteHandler | undefined {
 }
 
 /**
- * Statuses set by a file-scoped Express error-handling middleware —
- * `app.use((err, req, res, next) => ...)` — applied to every route in the same file.
+ * Statuses set by an Express error-handling middleware — `app.use((err, req, res, next) => ...)` —
+ * applied to a route when the middleware is in the route's own file (unconditionally) or is
+ * registered on the same app/router instance (by symbol identity) anywhere else in the project.
  */
-export function expressErrorMiddlewareStatuses(sourceFile: SourceFile): ResponseType[] {
+export function expressErrorMiddlewareStatuses(route: ResolvedRoute): ResponseType[] {
   const statuses = new Set<number>();
+  const routeFile = route.method.getSourceFile();
 
-  for (const call of sourceFile.getDescendantsOfKind(SyntaxKind.CallExpression)) {
-    const info = methodCallInfo(call);
-    if (!info || info.method !== 'use') continue;
-    const handler = asErrorHandler(info.node.getArguments()[0]);
-    const resParam = handler?.getParameters()[2];
-    if (!handler || !resParam) continue;
-    for (const { status } of expressStatusResponses(handler, resParam, undefined)) {
-      if (status !== 200) statuses.add(status);
+  for (const sourceFile of routeFile.getProject().getSourceFiles()) {
+    for (const call of sourceFile.getDescendantsOfKind(SyntaxKind.CallExpression)) {
+      const info = methodCallInfo(call);
+      if (!info || info.method !== 'use') continue;
+      const handler = asErrorHandler(info.node.getArguments()[0]);
+      const resParam = handler?.getParameters()[2];
+      if (!handler || !resParam) continue;
+
+      const sameFile = sourceFile === routeFile;
+      if (!sameFile && (!route.receiver || !sameAppInstance(info.receiver, route.receiver))) continue;
+
+      for (const { status } of expressStatusResponses(handler, resParam, undefined)) {
+        if (status !== 200) statuses.add(status);
+      }
     }
   }
 

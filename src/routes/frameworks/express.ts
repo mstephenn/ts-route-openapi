@@ -25,7 +25,7 @@ export function extractExpress(
 
   const response = usableResponse(resArg) ?? usableResponse(args[1]);
   const responses = res ? expressStatusResponses(route.method, res, response) : [];
-  const middlewareStatuses = res ? expressErrorMiddlewareStatuses(route.method.getSourceFile()) : [];
+  const middlewareStatuses = res ? expressErrorMiddlewareStatuses(route) : [];
   const merged =
     middlewareStatuses.length > 0
       ? mergeResponses(responses.length > 0 ? responses : [{ status: 200, type: response }], middlewareStatuses)

@@ -230,10 +230,12 @@ See [`CONTRIBUTING.md`](./CONTRIBUTING.md) for the full workflow.
   subclass (by name), a generic `HttpException(_, status)`, or a local
   class whose own or inherited `status`/`statusCode` property is a numeric
   literal. Express's `app.use((err, req, res, next) => ...)` error-handling
-  middleware contributes its `res.status(N)` calls to every route in the
-  same file. Statuses set any other way — resolved dynamically, thrown
-  from a re-exported third-party exception class, or set by middleware
-  registered in a different file than the routes it guards — are not seen.
+  middleware contributes its `res.status(N)` calls to every route
+  registered on the same `app`/router instance, whether or not the
+  middleware lives in the same file. Statuses set any other way — resolved
+  dynamically, thrown from a re-exported third-party exception class, or
+  set by middleware on a router mounted into the app (`app.use('/prefix',
+  router)`) rather than the app instance itself — are not seen.
 - **Callable types** (functions, methods) map to a schema-less
   `{ description: 'Function: <signature text>' }` (overridden by the
   property's own JSDoc when present) rather than being hoisted like an

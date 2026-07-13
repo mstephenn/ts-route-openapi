@@ -14,7 +14,7 @@ export function scanRoutes(project: Project, verbs: HttpVerb[] = DEFAULT_VERBS):
   const bindings: RouteBinding[] = [];
 
   for (const sourceFile of project.getSourceFiles()) {
-    for (const { node, method } of methodCallsIn(sourceFile, verbSet)) {
+    for (const { node, method, receiver } of methodCallsIn(sourceFile, verbSet)) {
       const args = node.getArguments();
       if (args.length < 2) continue;
       const pathArg = args[0];
@@ -27,6 +27,7 @@ export function scanRoutes(project: Project, verbs: HttpVerb[] = DEFAULT_VERBS):
         path: pathArg.getLiteralValue(),
         handlerExpression: args[handlerIndex],
         middlewareExpressions: args.slice(1, handlerIndex),
+        receiver,
       });
     }
   }
