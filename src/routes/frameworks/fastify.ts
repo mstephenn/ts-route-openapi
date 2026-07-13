@@ -26,9 +26,15 @@ export function extractFastify(
   const generic = usable(req.getType().getTypeArguments()[0]);
   const member = (name: string) => generic?.getProperty(name)?.getTypeAtLocation(req);
 
+  // A handler returning the reply object itself (`return reply.send(x)`, or a
+  // helper that does the same) already sent its response elsewhere — the
+  // return type is FastifyReply's own shape, not a payload, so it must be
+  // ignored rather than turned into a schema.
+  const returnType = unwrapPromise(route.method.getReturnType());
+  const replyParam = params[1];
+  const returnsReply = replyParam && typeName(returnType) === typeName(replyParam.getType());
   const response =
-    usableResponse(unwrapPromise(route.method.getReturnType())) ??
-    usableResponse(member('Reply'));
+    (returnsReply ? undefined : usableResponse(returnType)) ?? usableResponse(member('Reply'));
   const responses = fastifyStatusResponses(route.method, params[1], response);
 
   return {

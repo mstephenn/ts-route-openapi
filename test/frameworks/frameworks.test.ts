@@ -62,6 +62,22 @@ test('fastify: extracts the route generic and the handler return type', () => {
   expect(types.response?.getText()).toBe('{ done: boolean; }');
 });
 
+test('fastify: a handler that returns reply.send(x) does not leak FastifyReply as the response schema', () => {
+  const [route] = routesFrom({
+    'app.ts': `
+      interface FastifyRequest<RG = unknown> { params: unknown }
+      interface FastifyReply { send(payload: unknown): FastifyReply; routeOptions: { method: string } }
+      declare const app: any;
+      app.get('/openapi.yaml', (req: FastifyRequest, reply: FastifyReply) => {
+        return reply.send('yaml-string');
+      });
+    `,
+  });
+  const types = extractTypes(route);
+
+  expect(types.response).toBeUndefined();
+});
+
 test('hono: reads TypedResponse<T> from the handler return type, tokens from the path', () => {
   const [route] = routesFrom({
     '/node_modules/hono/index.d.ts': `
