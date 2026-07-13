@@ -318,6 +318,21 @@ test('infers bearer security from Express-style route middleware names', () => {
   expect(getOperation(doc, '/admin', 'get').security).toEqual([{ bearerAuth: [] }]);
 });
 
+test('infers bearer security from passport authenticate strategy middleware', () => {
+  const doc = buildOpenApi(
+    inputsFrom(`
+      declare const passport: { authenticate(strategy: string): unknown };
+      declare const app: any;
+      app.get('/admin', passport.authenticate('jwt'), () => ({ ok: true }));
+    `),
+  );
+
+  expect(doc.components!.securitySchemes).toEqual({
+    bearerAuth: { type: 'http', scheme: 'bearer' },
+  });
+  expect(getOperation(doc, '/admin', 'get').security).toEqual([{ bearerAuth: [] }]);
+});
+
 test('infers bearer security from Hono middleware names', () => {
   const doc = buildOpenApi(
     inputsFrom(`
@@ -396,13 +411,16 @@ test('does not infer security from ambiguous middleware', () => {
   const doc = buildOpenApi(
     inputsFrom(`
       function checkSession(req: unknown, res: unknown, next: () => void): void { next(); }
+      function basicInfo(req: unknown, res: unknown, next: () => void): void { next(); }
       declare const app: any;
       app.get('/maybe', checkSession, () => ({ ok: true }));
+      app.get('/info', basicInfo, () => ({ ok: true }));
     `),
   );
 
   expect(doc.components?.securitySchemes).toBeUndefined();
   expect(getOperation(doc, '/maybe', 'get').security).toBeUndefined();
+  expect(getOperation(doc, '/info', 'get').security).toBeUndefined();
 });
 
 test('configured security takes precedence over inferred middleware security', () => {

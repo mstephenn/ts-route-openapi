@@ -106,7 +106,7 @@ function securityFromName(name: string): SchemeEvidence | undefined {
   const normalized = name.replace(/[^a-z0-9]/gi, '').toLowerCase();
   if (!/(auth|guard|passport|jwt|bearer|basic|apikey|api)/.test(normalized)) return undefined;
   if (normalized.includes('jwt') || normalized.includes('bearer')) return bearer();
-  if (normalized.includes('basic')) return basic();
+  if (normalized.includes('basic') && /(auth|guard|passport)/.test(normalized)) return basic();
   return undefined;
 }
 
