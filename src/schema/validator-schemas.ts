@@ -11,6 +11,8 @@ export interface ValidatorSchemas {
   bodySchema?: Schema;
   query?: ParamType[];
   pathParams?: ParamType[];
+  headers?: ParamType[];
+  cookies?: ParamType[];
 }
 
 interface ZodResult {
@@ -31,6 +33,9 @@ export function extractValidatorSchemas(expressions: MorphNode[]): ValidatorSche
 
     const fastify = fastifyRouteOptionSchemas(expression);
     if (fastify) mergeValidatorSchemas(result, fastify);
+
+    const generic = genericMiddlewareValidatorSchema(expression);
+    if (generic) mergeValidatorSchemas(result, generic);
   }
 
   return result;
@@ -40,6 +45,8 @@ function mergeValidatorSchemas(target: ValidatorSchemas, source: ValidatorSchema
   target.bodySchema = source.bodySchema ?? target.bodySchema;
   target.query = source.query ?? target.query;
   target.pathParams = source.pathParams ?? target.pathParams;
+  target.headers = source.headers ?? target.headers;
+  target.cookies = source.cookies ?? target.cookies;
 }
 
 function honoValidatorSchema(expression: Expression): ValidatorSchemas | undefined {
@@ -56,6 +63,8 @@ function honoValidatorSchema(expression: Expression): ValidatorSchemas | undefin
   if (target === 'json') return { bodySchema: schema };
   if (target === 'query') return { query: schemaToParams(schema) };
   if (target === 'param') return { pathParams: schemaToParams(schema) };
+  if (target === 'header') return { headers: schemaToParams(schema) };
+  if (target === 'cookie') return { cookies: schemaToParams(schema) };
   return undefined;
 }
 
@@ -68,12 +77,53 @@ function fastifyRouteOptionSchemas(expression: Expression): ValidatorSchemas | u
   const body = propertyExpression(schemaExpression, 'body');
   const query = propertyExpression(schemaExpression, 'querystring') ?? propertyExpression(schemaExpression, 'query');
   const params = propertyExpression(schemaExpression, 'params');
+  const headers = propertyExpression(schemaExpression, 'headers');
+  const cookies = propertyExpression(schemaExpression, 'cookies');
 
   if (body) result.bodySchema = schemaExpressionToOpenApi(body);
   if (query) result.query = schemaToParams(schemaExpressionToOpenApi(query));
   if (params) result.pathParams = schemaToParams(schemaExpressionToOpenApi(params));
+  if (headers) result.headers = schemaToParams(schemaExpressionToOpenApi(headers));
+  if (cookies) result.cookies = schemaToParams(schemaExpressionToOpenApi(cookies));
 
   return result;
+}
+
+function genericMiddlewareValidatorSchema(expression: Expression): ValidatorSchemas | undefined {
+  if (!Node.isCallExpression(expression)) return undefined;
+  const [first, second] = expression.getArguments();
+  const target = validatorTarget(expression.getExpression().getText(), first);
+  const schemaArg = second && Node.isStringLiteral(first) ? second : first;
+  if (!target || !schemaArg || !Node.isExpression(schemaArg)) return undefined;
+
+  const schema = schemaExpressionToOpenApi(schemaArg);
+  if (target === 'body') return { bodySchema: schema };
+  if (target === 'query') return { query: schemaToParams(schema) };
+  if (target === 'params') return { pathParams: schemaToParams(schema) };
+  if (target === 'headers') return { headers: schemaToParams(schema) };
+  if (target === 'cookies') return { cookies: schemaToParams(schema) };
+  return undefined;
+}
+
+function validatorTarget(calleeText: string, firstArg: MorphNode | undefined): 'body' | 'query' | 'params' | 'headers' | 'cookies' | undefined {
+  const normalized = calleeText.split('.').at(-1)?.replace(/[^a-z0-9]/gi, '').toLowerCase() ?? '';
+  if (!/(validate|validator|schema)/.test(normalized)) return undefined;
+
+  if (firstArg && Node.isStringLiteral(firstArg)) {
+    const target = firstArg.getLiteralValue().toLowerCase();
+    if (target === 'body' || target === 'json') return 'body';
+    if (target === 'query') return 'query';
+    if (target === 'param' || target === 'params' || target === 'path') return 'params';
+    if (target === 'header' || target === 'headers') return 'headers';
+    if (target === 'cookie' || target === 'cookies') return 'cookies';
+  }
+
+  if (normalized.includes('body') || normalized.includes('json')) return 'body';
+  if (normalized.includes('query')) return 'query';
+  if (normalized.includes('param') || normalized.includes('path')) return 'params';
+  if (normalized.includes('header')) return 'headers';
+  if (normalized.includes('cookie')) return 'cookies';
+  return undefined;
 }
 
 function schemaExpressionToOpenApi(expression: Expression): Schema {
