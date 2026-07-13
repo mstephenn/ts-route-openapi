@@ -192,6 +192,60 @@ test('a shadowed param in a nested closure is not misattributed for either expre
   expect(extractTypes(fastifyRoute).responses).toBeUndefined();
 });
 
+test('a cross-file Express error-handling middleware on the same app instance adds its statuses too', () => {
+  const project = createProjectWithFiles({
+    'app.ts': `export declare const app: any;`,
+    'routes.ts': `
+      ${EXPRESS_DECLS}
+      import { app } from './app.js';
+      interface Order { id: string }
+      app.get('/orders/:id', (req: Request<{ id: string }>, res: Response<Order>) => {
+        res.json({ id: 'x' } as Order);
+      });
+    `,
+    'error-handler.ts': `
+      ${EXPRESS_DECLS}
+      import { app } from './app.js';
+      app.use((err: unknown, req: Request, res: Response, next: () => void) => {
+        res.status(500).json({ message: 'boom' });
+      });
+    `,
+  });
+  const [route] = scanResolvedRoutes(project);
+  const types = extractTypes(route);
+
+  expect(types.responses?.map((r) => [r.status, r.type?.getText()])).toEqual([
+    [200, 'Order'],
+    [500, undefined],
+  ]);
+});
+
+test('error middleware on an unrelated app instance in another file is not applied', () => {
+  const project = createProjectWithFiles({
+    'app-a.ts': `export declare const appA: any;`,
+    'app-b.ts': `export declare const appB: any;`,
+    'routes.ts': `
+      ${EXPRESS_DECLS}
+      import { appA } from './app-a.js';
+      interface Order { id: string }
+      appA.get('/orders/:id', (req: Request<{ id: string }>, res: Response<Order>) => {
+        res.json({ id: 'x' } as Order);
+      });
+    `,
+    'error-handler.ts': `
+      ${EXPRESS_DECLS}
+      import { appB } from './app-b.js';
+      appB.use((err: unknown, req: Request, res: Response, next: () => void) => {
+        res.status(500).json({ message: 'boom' });
+      });
+    `,
+  });
+  const [route] = scanResolvedRoutes(project);
+  const types = extractTypes(route);
+
+  expect(types.responses?.map((r) => [r.status, r.type?.getText()])).toEqual([[200, 'Order']]);
+});
+
 test('sameAppInstance matches an app identifier to itself across files via import, not to an unrelated identifier', () => {
   const project = createProjectWithFiles({
     'app.ts': `export declare const app: any;`,
