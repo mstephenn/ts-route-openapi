@@ -1,5 +1,6 @@
-import { Node, SyntaxKind, type ClassDeclaration } from 'ts-morph';
+import { Node, SyntaxKind, type ClassDeclaration, type NewExpression } from 'ts-morph';
 import {
+  createWarnOnce,
   methodCallInfo,
   resolveIdentifierDeclaration,
   type ResolvedRoute,
@@ -7,6 +8,47 @@ import {
   type RouteHandler,
 } from '../../shared/index.js';
 import { expressStatusResponses, literalStatus, sameAppInstance } from './status-calls.js';
+
+const warnOnce = createWarnOnce();
+
+/** tRPC's standard `TRPCError` code -> HTTP status mapping (`@trpc/server`'s `TRPC_ERROR_CODES_BY_KEY`). */
+const TRPC_ERROR_STATUS: Record<string, number> = {
+  BAD_REQUEST: 400,
+  UNAUTHORIZED: 401,
+  FORBIDDEN: 403,
+  NOT_FOUND: 404,
+  METHOD_NOT_SUPPORTED: 405,
+  TIMEOUT: 408,
+  CONFLICT: 409,
+  PRECONDITION_FAILED: 412,
+  PAYLOAD_TOO_LARGE: 413,
+  UNSUPPORTED_MEDIA_TYPE: 415,
+  UNPROCESSABLE_CONTENT: 422,
+  TOO_MANY_REQUESTS: 429,
+  CLIENT_CLOSED_REQUEST: 499,
+  INTERNAL_SERVER_ERROR: 500,
+  NOT_IMPLEMENTED: 501,
+  BAD_GATEWAY: 502,
+  SERVICE_UNAVAILABLE: 503,
+  GATEWAY_TIMEOUT: 504,
+};
+
+/** A `TRPCError`'s status via its object-literal `{ code: "X", ... }` argument. */
+function trpcErrorStatus(expr: NewExpression): number | undefined {
+  const [arg] = expr.getArguments();
+  if (!arg || !Node.isObjectLiteralExpression(arg)) return undefined;
+
+  const codeProp = arg.getProperty('code');
+  const codeValue = codeProp && Node.isPropertyAssignment(codeProp) ? codeProp.getInitializer() : undefined;
+  if (!codeValue) return undefined;
+
+  if (!Node.isStringLiteral(codeValue)) {
+    warnOnce(`dynamic TRPCError code:${expr.getText().slice(0, 80)}`, `ts-route-openapi: skipped middleware inference for ${expr.getText().slice(0, 80)} (dynamic TRPCError code).`);
+    return undefined;
+  }
+
+  return TRPC_ERROR_STATUS[codeValue.getLiteralValue()];
+}
 
 /** NestJS built-in `HttpException` subclasses (`@nestjs/common`) and the status each maps to. */
 const NEST_HTTP_EXCEPTIONS: Record<string, number> = {
@@ -49,6 +91,7 @@ function resolveThrownStatus(expr: Node): number | undefined {
 
   if (name !== undefined && name in NEST_HTTP_EXCEPTIONS) return NEST_HTTP_EXCEPTIONS[name];
   if (name === 'HttpException') return literalStatus(expr.getArguments()[1]);
+  if (name === 'TRPCError') return trpcErrorStatus(expr);
 
   const declaration = Node.isIdentifier(ctor)
     ? ctor.getSymbol()?.getDeclarations().find(Node.isClassDeclaration)
